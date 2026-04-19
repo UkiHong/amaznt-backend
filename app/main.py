@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.schemas import PostCreateRequest, PostCreateResponse
 
 app = FastAPI(title="Amazn't Backend")
 
@@ -11,3 +12,13 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.post("/sample/posts", response_model=PostCreateResponse)
+def create_sample_post(request: PostCreateRequest):
+    return PostCreateResponse(
+        id=1,
+        title=request.title,
+        content=request.content,
+        message="sample post created",
+    )
