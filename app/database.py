@@ -1,5 +1,8 @@
 import os
 
+
+from collections.abc import AsyncGenerator
+
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -7,47 +10,34 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import declarative_base
-from collections.abc import AsyncGenerator
 
-# 1. .env 파일 읽기
-# .env 안에 있는 DATABASE_URL 값을 파이썬에서 읽을 수 있게 해줍니다.
+# reading .env file to get environment variables.
 load_dotenv()
 
-# 2. DB 연결 주소 가져오기
-# postgresql+asyncpg://postgres:postgres@localhost:5432/amaznt
+# Bring DATABASE_URL from environment variable, and raise error if not set
 database_url = os.getenv("DATABASE_URL")
-
 if not database_url:
     raise ValueError("DATABASE_URL is not set in the .env file.")
 
-# 3. SQLAlchemy async engine 만들기
-# engine은 "DB와 연결해주는 큰 연결 관리자"라고 생각하면 됩니다.
+# SQLAlchemy async engine creation, connecting database.
 database_engine = create_async_engine(
     database_url,
-    echo=True,  # 개발 중에는 실행되는 SQL을 터미널에 보여줌
+    echo=True,  # showing SQL queries in the console for debugging, can be turned off in production
 )
 
-# 4. 세션 공장 만들기
-# sessionmaker는 "세션 찍어내는 공장"입니다.
-# 요청이 들어올 때마다 세션 하나씩 만들어서 쓰게 됩니다.
+# sessionmaker is a "factory for creating sessions". Each request will get its own session from this factory.
 async_session_factory = async_sessionmaker(
     bind=database_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
 
-
-# 5. 모든 SQLAlchemy 모델이 상속할 Base
-# 나중에 User 모델 만들 때:
-# class User(Base):
-#     ...
-# 이런 식으로 쓸 겁니다.
+# Base is a base class for all SQLAlchemy models.
 Base = declarative_base()
 
 
-# 6. FastAPI에서 사용할 DB 세션 의존성
-# API 함수에서 Depends(get_db_session) 형태로 사용합니다.
-# 요청 하나당 세션 하나를 열고, 끝나면 자동으로 닫습니다.
+# Dependency function to provide a database session for FastAPI endpoints, ensuring proper opening and closing of sessions per request.
+# Using Depends(get_db_session) in API functions allows each request to have its own session that is automatically closed after the request is processed.
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_factory() as session:
         yield session
