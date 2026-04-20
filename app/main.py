@@ -1,21 +1,24 @@
+# to bring os.getenv()
 import os
 
-# to bring os.getenv()
-
+# to bring load_dotenv() function to load environment variables from a .env file
 from dotenv import load_dotenv
 
-# to bring load_dotenv() function to load environment variables from a .env file
 
 from fastapi import FastAPI
-from app.schemas import PostCreateRequest, PostCreateResponse
+
+# main.py is the house for routers from api folder, and schemas from schemas.py, and also the main entry point for the application
+from app.api.health import router as health_router
+from app.api.sample import router as sample_router
 
 load_dotenv()  # Load environment variables from .env file
 
 app_name = os.getenv("APP_NAME")
+# get debug mode from environment variable, default to false if not set and convert to boolean
 debug_mode = os.getenv("DEBUG", "false").lower() == "true"
 
 
-app = FastAPI(title="Amazn't Backend")
+app = FastAPI(title=app_name, debug=debug_mode)
 
 
 @app.get("/")
@@ -26,16 +29,5 @@ def read_root():
     }
 
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-
-@app.post("/sample/posts", response_model=PostCreateResponse)
-def create_sample_post(request: PostCreateRequest):
-    return PostCreateResponse(
-        id=1,
-        title=request.title,
-        content=request.content,
-        message="sample post created",
-    )
+app.include_router(health_router)
+app.include_router(sample_router)
