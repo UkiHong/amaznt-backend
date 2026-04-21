@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.schemas import (
+from app.schemas.post import (
     PostCreateRequest,
     PostCreateResponse,
     PostResponse,

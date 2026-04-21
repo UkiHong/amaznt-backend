@@ -10,6 +10,7 @@ from fastapi import FastAPI
 # main.py is the house for routers from api folder, and schemas from schemas.py, and also the main entry point for the application
 from app.api.health import router as health_router
 from app.api.sample import router as sample_router
+from app.api.auth import router as auth_router
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -31,3 +32,4 @@ def read_root():
 
 app.include_router(health_router)
 app.include_router(sample_router)
+app.include_router(auth_router)
