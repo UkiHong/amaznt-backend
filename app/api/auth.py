@@ -5,8 +5,8 @@ auth.py is for authentication related endpoints.
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import get_db_session
-from app.schemas.user import UserCreate, UserResponse
-from app.core.security import hash_password
+from app.schemas.user import UserCreate, UserResponse, UserLogin, TokenResponse
+from app.core.security import create_access_token, hash_password, verify_password
 from sqlalchemy import select, or_
 from app.models.user import User
 
@@ -19,18 +19,6 @@ router = APIRouter(
 @router.get("/register-test")
 def auth_check():
     return {"status": "ok"}
-
-
-"""
-# test function to check if the registration request body is received correctly, step 1 for testing the registration endpoint
-@router.post("/register-test")
-def register_test(user_data: UserCreate):
-    return {
-        "message": "register body received successfully",
-        "username": user_data.username,
-        "email": user_data.email,
-    }
-"""
 
 
 # Register endpoint for testing the registration request body, step 2 for testing the registration endpoint with DB interaction and password hashing
@@ -86,3 +74,34 @@ async def register_test(
     await db.refresh(new_user)
 
     return new_user
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    login_data: UserLogin,
+    db=Depends(get_db_session),
+):
+    result = await db.execute(select(User).where(User.email == login_data.email))
+
+    existing_user = result.scalar_one_or_none()
+
+    # If user with the email does not exist, or if the password is incorrect, raise error
+    if not existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+        # Verifying the hased password in the DB with the plain password received in the request body.
+    if not verify_password(login_data.password, existing_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    access_token = create_access_token(data={"sub": existing_user.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }

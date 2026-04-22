@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+# Schema for user registration request
 class UserCreate(BaseModel):
     username: str = Field(
         description="Username for registration",
@@ -26,6 +27,7 @@ class UserCreate(BaseModel):
     )
 
 
+# Schema for user registration response
 class UserResponse(BaseModel):
     id: int = Field(description="User ID", examples=[1])
     username: str = Field(description="Username", examples=["uki_dev"])
@@ -47,6 +49,13 @@ class UserResponse(BaseModel):
     )  # Enable ORM mode for SQLAlchemy models, needed for converting dictionary data to pydantic models.
 
 
+# Schema for user login request
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+# Schema for JWT token response
 class TokenResponse(BaseModel):
     access_token: str = Field(
         description="JWT access token issued after successful login",
