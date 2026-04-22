@@ -10,3 +10,5 @@ Week 2 - PostgreSQL + SQLAlchemy + Alembic setting + a basic User model setup.
 - Added Alembic migrations to keep track of schema changes.
 - Created a User model with common fields like username, email, role, bio, created_at, and is_active.
 
+Week 2's Troubleshooting issues
+1. I initially used `bcrypt` / `passlib` for password hashing, but ran into a 72-byte password limit issue during registration. After checking the latest FastAPI ecosystem guidance, I replaced it with `pwdlib` using Argon2, which resolved the issue and matched the current recommended approach. [web:33][web:464][web:517]
