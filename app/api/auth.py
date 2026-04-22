@@ -5,8 +5,14 @@ auth.py is for authentication related endpoints.
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import get_db_session
-from app.schemas.user import UserCreate, UserResponse, UserLogin, TokenResponse
-from app.core.security import create_access_token, hash_password, verify_password
+from app.schemas.user import UserCreate, UserResponse, TokenResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 from sqlalchemy import select, or_
 from app.models.user import User
 
@@ -78,10 +84,10 @@ async def register_test(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    login_data: UserLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db=Depends(get_db_session),
 ):
-    result = await db.execute(select(User).where(User.email == login_data.email))
+    result = await db.execute(select(User).where(User.email == form_data.username))
 
     existing_user = result.scalar_one_or_none()
 
@@ -92,16 +98,23 @@ async def login(
             detail="Invalid email or password",
         )
 
-        # Verifying the hased password in the DB with the plain password received in the request body.
-    if not verify_password(login_data.password, existing_user.hashed_password):
+    # If user exists, Verifying the hased password in the DB with the plain password received in the request body.
+    if not verify_password(form_data.password, existing_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
+    # If the password is correct, Creating a JWT Token with the user's email as the subject.
     access_token = create_access_token(data={"sub": existing_user.email})
 
     return {
         "access_token": access_token,
         "token_type": "bearer",
     }
+
+
+# Endpoint for the current user after verifying JWT token.
+@router.get("/me", response_model=UserResponse)
+async def read_me(current_user: User = Depends(get_current_user)):
+    return current_user
