@@ -21,11 +21,13 @@ def hash_password(password: str) -> str:
 
 
 # Password verification
+# Used for /login endpoint to verify user's plain password with the hashed one.
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
 
 
 # Creating JWT access token for authenticated users.
+# Used for /login endpoint if password is correct.
 def create_access_token(data: dict) -> str:
     # Creating a copy of the original payload to avoid modifying it directly.
     to_encode = data.copy()
@@ -52,12 +54,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 # Dependency function to get the current user from the JWT token.
+# Used for /me endpoint.
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db=Depends(get_db_session),
 ):
 
-    # For invalid token or decoding failures.
+    # Raising a HTTP error for invalid token or decoding failures.
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -88,3 +91,16 @@ async def get_current_user(
         raise credentials_exception
 
     return existing_user
+
+
+# Checking if the current user(the existing user from "get_current_user") is active
+# Used for /me endpoint to ensure only active users can access their info.
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
+        )
+    return current_user

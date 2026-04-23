@@ -9,6 +9,7 @@ from app.schemas.user import UserCreate, UserResponse, TokenResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from app.core.security import (
     create_access_token,
+    get_current_active_user,
     get_current_user,
     hash_password,
     verify_password,
@@ -116,5 +117,5 @@ async def login(
 
 # Endpoint for the current user after verifying JWT token.
 @router.get("/me", response_model=UserResponse)
-async def read_me(current_user: User = Depends(get_current_user)):
+async def read_me(current_user: User = Depends(get_current_active_user)):
     return current_user
