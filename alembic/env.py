@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 from app.database import Base
-from app.models import User
+import app.models  # Importing models to ensure they are registered with SQLAlchemy's metadata for Alembic migrations.
 
 # ---------------------------
 
