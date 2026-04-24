@@ -15,8 +15,6 @@ def test_login_success():
 
 
 # Test for /me endpoint
-
-
 def test_me_without_token_returns_401():
     response = client.get("/auth/me")
 
@@ -36,10 +34,6 @@ def test_login_with_wrong_credentials_returns_401():
 
 
 def test_me_returns_current_active_user():
-    pass
-
-
-def test_me_without_token_returns_401():
     pass
 
 
