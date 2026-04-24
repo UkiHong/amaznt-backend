@@ -1,7 +1,7 @@
 # Amaznt Backend
 
 Backend API for **Amazn't**, a community platform where users share, browse, and discuss failed or hilariously bad purchases.  
-The core idea is simple: turn regrettable shopping decisions into searchable, discussable community content with a **Rubbish Score**.
+The core idea is simple: turn regrettable shopping decisions into searchable, discussable community content with a **Buyer Regret Score**.
 
 ## Overview
 
@@ -20,13 +20,12 @@ I wanted to build a backend project that also covers the parts that matter in pr
 - troubleshooting real implementation issues
 - testing and deployment preparation
 
-## Main Goals
 ## MVP Roadmap
 
 | Version | Goal | Scope | Outcome |
 |---|---|---|---|
-| MVP v1 | Build the foundation | FastAPI setup, PostgreSQL, SQLAlchemy, Alembic, User model, registration, login, `/auth/me`, basic posts/comments, local run, smoke tests | A working backend with authentication and core CRUD skeleton |
-| MVP v2 | Expand community behavior | Reactions, rubbish score, ranking, reports, moderation, notifications, image upload, stronger tests | A more interactive community backend with richer user behavior |
+| MVP v1 | Build the foundation | FastAPI setup, PostgreSQL, SQLAlchemy, Alembic, User model, registration, login, `/auth/me`, Product Fail Post CRUD, Buyer Regret Score v1, local run, smoke tests | A working backend with authentication, post CRUD, and regret score calculation |
+| MVP v2 | Expand community behavior | Comments, reactions, Buyer Regret Score v2, ranking, reports, moderation, image upload, stronger tests | A more interactive community backend with richer user behavior |
 | MVP v3 | Production readiness | Redis cache, rate limiting, Docker, GitHub Actions, deployment, performance tuning, documentation polish | A portfolio-ready backend with operational and performance maturity |
 
 ## Tech Stack
@@ -66,14 +65,17 @@ I wanted to build a backend project that also covers the parts that matter in pr
 |---|---|---|
 | Auth endpoint tests | In progress | pytest skeleton next |
 | README and API docs | In progress | Project documentation is being cleaned up |
+| Product Fail Post CRUD | Next | Week 4 feature: create, read, update, delete failed purchase posts |
+| Buyer Regret Score v1 | Next | Week 4 feature: calculate and store the first weighted score version |
 
 ### Planned
 
 | Feature | Status | Notes |
 |---|---|---|
-| Post model and CRUD | Planned | Main content layer |
+| Product Fail Post model | Planned | Main content layer for failed purchase reviews |
+| Product Fail Score model | Planned | Stores Buyer Regret Score values and calculation version |
 | Comment CRUD | Planned | User discussion layer |
-| Reaction / rubbish score | Planned | Core project identity |
+| Reaction system | Planned | Community feedback for v2 score calculation |
 | Ranking / popular posts | Planned | Community engagement layer |
 | Admin / moderation features | Planned | Reporting and control |
 | Redis caching and rate limiting | Planned | Performance and abuse control |
@@ -95,3 +97,9 @@ app/
 ```
 
 This project separates ORM models from Pydantic schemas so database objects and API contracts stay clear and maintainable.
+
+## Buyer Regret Score
+
+Buyer Regret Score is the main feature of this project. In MVP v1, the score will be calculated from user-entered regret inputs such as value regret, description mismatch, quality disappointment, funniness, and anger.
+
+The first version will use a simple weighted formula in Python and store the result with a calculation version, so future score formulas can be added without losing track of how older scores were created.
