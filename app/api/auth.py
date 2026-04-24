@@ -29,7 +29,11 @@ def auth_check():
 
 
 # Register endpoint for testing the registration request body, step 2 for testing the registration endpoint with DB interaction and password hashing
-@router.post("/register-test", response_model=UserResponse)
+@router.post(
+    "/register-test",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def register_test(
     user_data: UserCreate,
     db=Depends(get_db_session),
