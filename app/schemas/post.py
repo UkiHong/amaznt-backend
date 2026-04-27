@@ -28,10 +28,18 @@ class PostCreateRequest(BaseModel):
     anger_score: int = Field(ge=1, le=5, description="Score for anger, between 1 and 5")
 
 
+class ProductFailScoreResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    final_score: Decimal
+    grade: str
+    calculation_version: str
+
+
 # getting a single post
 class PostResponse(BaseModel):
-    # Enable ORM mode for SQLAlchemy models, needed for reading SQLAlchemy objects and attributes.
-    # need this to convert SQLAlchemy object into pydantic model in api/posts.py
+    # Allows Pydantic to build this response model from a SQLAlchemy ORM object.
+    # Without this, Pydantic expects a dict-like object and may fail when we return a Post model instance.
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -44,6 +52,8 @@ class PostResponse(BaseModel):
     product_url: str | None = None
     category: str
     created_at: datetime
+
+    score: ProductFailScoreResponse | None = None
 
 
 # getting a list of posts with count

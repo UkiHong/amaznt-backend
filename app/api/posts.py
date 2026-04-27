@@ -93,4 +93,23 @@ async def get_post(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Post not found",
         )
-    return post
+
+    # Getting the final score and grade from ProductFailScore table.
+    score_result = await db.execute(
+        select(ProductFailScore).where(ProductFailScore.post_id == post_id)
+    )
+    score = score_result.scalar_one_or_none()
+
+    return {
+        "id": post.id,
+        "author_id": post.author_id,
+        "title": post.title,
+        "product_name": post.product_name,
+        "price_paid": post.price_paid,
+        "fail_reason": post.fail_reason,
+        "platform": post.platform,
+        "product_url": post.product_url or None,
+        "category": post.category,
+        "created_at": post.created_at,
+        "score": score,
+    }
