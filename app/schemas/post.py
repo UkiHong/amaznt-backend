@@ -2,7 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PostCreateRequest(BaseModel):
@@ -13,6 +13,19 @@ class PostCreateRequest(BaseModel):
     platform: str
     product_url: str | None = None
     category: str
+    value_regret_score: int = Field(
+        ge=1, le=5, description="Score for value regret, between 1 and 5"
+    )
+    description_mismatch_score: int = Field(
+        ge=1, le=5, description="Score for description mismatch, between 1 and 5"
+    )
+    quality_disappointment_score: int = Field(
+        ge=1, le=5, description="Score for quality disappointment, between 1 and 5"
+    )
+    funniness_score: int = Field(
+        ge=1, le=5, description="Score for funniness, between 1 and 5"
+    )
+    anger_score: int = Field(ge=1, le=5, description="Score for anger, between 1 and 5")
 
 
 # getting a single post
