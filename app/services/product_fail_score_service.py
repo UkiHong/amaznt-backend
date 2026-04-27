@@ -1,6 +1,11 @@
 from decimal import Decimal
 
-
+# fail_score_v1:
+# value_regret_score = 0.30
+# description_mismatch_score = 0.25
+# quality_disappointment_score = 0.20
+# funniness_score = 0.10
+# anger_score = 0.15
 CALCULATION_VERSION = "fail_score_v1"
 
 
@@ -28,8 +33,8 @@ def calculate_final_score(
         Decimal(value_regret_score) * Decimal("0.30")
         + Decimal(description_mismatch_score) * Decimal("0.25")
         + Decimal(quality_disappointment_score) * Decimal("0.20")
-        + Decimal(funniness_score) * Decimal("0.15")
-        + Decimal(anger_score) * Decimal("0.10")
+        + Decimal(funniness_score) * Decimal("0.10")
+        + Decimal(anger_score) * Decimal("0.15")
     )
 
     return final_score.quantize(Decimal("0.01"))
