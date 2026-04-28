@@ -75,9 +75,33 @@ async def get_posts(
 ):
     result = await db.execute(select(Post))
     posts = result.scalars().all()
+
+    # This uses an N+1 query pattern for now. Optimize with a join or relationship loading later.
+    post_responses = []
+    for post in posts:
+        score_result = await db.execute(
+            select(ProductFailScore).where(ProductFailScore.post_id == post.id)
+        )
+        score = score_result.scalar_one_or_none()
+        post_responses.append(
+            {
+                "id": post.id,
+                "author_id": post.author_id,
+                "title": post.title,
+                "product_name": post.product_name,
+                "price_paid": post.price_paid,
+                "fail_reason": post.fail_reason,
+                "platform": post.platform,
+                "product_url": post.product_url or None,
+                "category": post.category,
+                "created_at": post.created_at,
+                "score": score,
+            }
+        )
+
     return PostListResponse(
-        posts=posts,
-        count=len(posts),
+        posts=post_responses,
+        count=len(post_responses),
     )
 
 
