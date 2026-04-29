@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette import status
 
 from app.core.security import get_current_active_user
@@ -71,9 +71,17 @@ async def create_post(
 
 @router.get("", response_model=PostListResponse)
 async def get_posts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(5, ge=1, le=100),
     db=Depends(get_db_session),
 ):
-    result = await db.execute(select(Post))
+
+    # offset is located under the get_posts because it's the server-side pagination logic, not from the user input.
+    offset = (page - 1) * page_size
+
+    result = await db.execute(
+        select(Post).order_by(Post.created_at.desc()).offset(offset).limit(page_size)
+    )
     posts = result.scalars().all()
 
     # This uses an N+1 query pattern for now. Optimize with a join or relationship loading later.
@@ -102,6 +110,8 @@ async def get_posts(
     return PostListResponse(
         posts=post_responses,
         count=len(post_responses),
+        page=page,
+        page_size=page_size,
     )
 
 

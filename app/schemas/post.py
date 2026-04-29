@@ -60,3 +60,5 @@ class PostResponse(BaseModel):
 class PostListResponse(BaseModel):
     posts: list[PostResponse]
     count: int
+    page: int
+    page_size: int
