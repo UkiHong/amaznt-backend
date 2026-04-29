@@ -266,3 +266,37 @@ async def update_post(
         "created_at": post.created_at,
         "score": score,
     }
+
+
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(
+    post_id: int,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this post",
+        )
+
+    # Deleting the associated score first, which is related to Post model with a foreign key.
+    # could be refactored with cascade delete later?
+    score_result = await db.execute(
+        select(ProductFailScore).where(ProductFailScore.post_id == post_id)
+    )
+    score = score_result.scalar_one_or_none()
+    if score:
+        await db.delete(score)
+
+    await db.delete(post)
+    await db.commit()
