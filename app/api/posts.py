@@ -12,7 +12,12 @@ from app.services.product_fail_score_service import (
     get_grade,
     normalize_score,
 )
-from app.schemas.post import PostCreateRequest, PostListResponse, PostResponse
+from app.schemas.post import (
+    PostCreateRequest,
+    PostListResponse,
+    PostResponse,
+    PostUpdateRequest,
+)
 
 router = APIRouter(
     prefix="/posts",
@@ -66,7 +71,19 @@ async def create_post(
 
     await db.commit()
     await db.refresh(new_post)
-    return new_post
+    return {
+        "id": new_post.id,
+        "author_id": new_post.author_id,
+        "title": new_post.title,
+        "product_name": new_post.product_name,
+        "price_paid": new_post.price_paid,
+        "fail_reason": new_post.fail_reason,
+        "platform": new_post.platform,
+        "product_url": new_post.product_url or None,
+        "category": new_post.category,
+        "created_at": new_post.created_at,
+        "score": new_score,
+    }
 
 
 @router.get("", response_model=PostListResponse)
@@ -133,6 +150,108 @@ async def get_post(
         select(ProductFailScore).where(ProductFailScore.post_id == post_id)
     )
     score = score_result.scalar_one_or_none()
+
+    return {
+        "id": post.id,
+        "author_id": post.author_id,
+        "title": post.title,
+        "product_name": post.product_name,
+        "price_paid": post.price_paid,
+        "fail_reason": post.fail_reason,
+        "platform": post.platform,
+        "product_url": post.product_url or None,
+        "category": post.category,
+        "created_at": post.created_at,
+        "score": score,
+    }
+
+
+@router.patch("/{post_id}", response_model=PostResponse)
+async def update_post(
+    post_id: int,
+    request: PostUpdateRequest,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this post",
+        )
+
+    score_result = await db.execute(
+        select(ProductFailScore).where(ProductFailScore.post_id == post_id)
+    )
+    score = score_result.scalar_one_or_none()
+    if score is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Score not found",
+        )
+
+    post_fields = {
+        "title",
+        "product_name",
+        "price_paid",
+        "fail_reason",
+        "platform",
+        "product_url",
+        "category",
+    }
+
+    score_fields = {
+        "value_regret_score",
+        "description_mismatch_score",
+        "quality_disappointment_score",
+        "funniness_score",
+        "anger_score",
+    }
+
+    # Update only the fields that are provided in the request (partial update).
+    update_data = request.model_dump(exclude_unset=True)
+
+    # Check if any score fields are updated. If yes, final_score will be recalculated.
+    score_changed = any(key in score_fields for key in update_data)
+
+    for key, value in update_data.items():
+        if key in post_fields:
+            if value is None and key != "product_url":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{key} cannot be null",
+                )
+            setattr(post, key, value)
+
+        elif key in score_fields:
+            if value is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{key} cannot be null",
+                )
+            setattr(score, key, normalize_score(value))
+
+    # "// 20" is to convert the normalized score back to the original 1-5 scale for final score calculation.
+    if score_changed:
+        score.final_score = calculate_final_score(
+            value_regret_score=score.value_regret_score // 20,
+            description_mismatch_score=score.description_mismatch_score // 20,
+            quality_disappointment_score=score.quality_disappointment_score // 20,
+            funniness_score=score.funniness_score // 20,
+            anger_score=score.anger_score // 20,
+        )
+        score.grade = get_grade(score.final_score)
+
+    await db.commit()
+    await db.refresh(post)
 
     return {
         "id": post.id,

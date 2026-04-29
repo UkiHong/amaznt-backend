@@ -62,3 +62,35 @@ class PostListResponse(BaseModel):
     count: int
     page: int
     page_size: int
+
+
+class PostUpdateRequest(BaseModel):
+    title: str | None = None
+    product_name: str | None = None
+    price_paid: Decimal | None = None
+    fail_reason: str | None = None
+    platform: str | None = None
+    product_url: str | None = None
+    category: str | None = None
+
+    value_regret_score: int | None = Field(
+        default=None, ge=1, le=5, description="Score for value regret, between 1 and 5"
+    )
+    description_mismatch_score: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Score for description mismatch, between 1 and 5",
+    )
+    quality_disappointment_score: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Score for quality disappointment, between 1 and 5",
+    )
+    funniness_score: int | None = Field(
+        default=None, ge=1, le=5, description="Score for funniness, between 1 and 5"
+    )
+    anger_score: int | None = Field(
+        default=None, ge=1, le=5, description="Score for anger, between 1 and 5"
+    )
