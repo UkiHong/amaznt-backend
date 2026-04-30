@@ -1,7 +1,7 @@
 from pydantic import ValidationError
 import pytest
 
-from app.schemas.post import PostCreateRequest
+from app.schemas.post import PostCreateRequest, PostUpdateRequest
 
 
 def test_create_post_without_token_returns_401():
@@ -39,3 +39,12 @@ def test_post_create_request_rejects_scores_outside_1_to_5():
             funniness_score=5,
             anger_score=2,
         )
+
+
+# PostUpdateRequest schema tests.
+def test_post_update_request_allows_partial_update():
+    request = PostUpdateRequest(title="Updated title")
+
+    assert request.title == "Updated title"
+    assert request.product_name is None
+    assert request.anger_score is None
