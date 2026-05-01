@@ -94,3 +94,23 @@ class PostUpdateRequest(BaseModel):
     anger_score: int | None = Field(
         default=None, ge=1, le=5, description="Score for anger, between 1 and 5"
     )
+
+
+# Comments Schemas--------------------------------------------------------------------
+class CommentCreateRequest(BaseModel):
+    content: str = Field(min_length=3, max_length=500)
+
+
+class CommentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    post_id: int
+    author_id: int
+    content: str
+    created_at: datetime
+
+
+class CommentListResponse(BaseModel):
+    comments: list[CommentResponse]
+    count: int

@@ -5,7 +5,7 @@ from starlette import status
 
 from app.core.security import get_current_active_user
 from app.database import get_db_session
-from app.models.post import Post, ProductFailScore
+from app.models.post import Comment, Post, ProductFailScore
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -13,6 +13,9 @@ from app.services.product_fail_score_service import (
     normalize_score,
 )
 from app.schemas.post import (
+    CommentCreateRequest,
+    CommentListResponse,
+    CommentResponse,
     PostCreateRequest,
     PostListResponse,
     PostResponse,
@@ -300,3 +303,70 @@ async def delete_post(
 
     await db.delete(post)
     await db.commit()
+
+
+# Comments Routers--------------------------------------------------------------------
+@router.post(
+    "/{post_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_comment(
+    post_id: int,
+    request: CommentCreateRequest,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    new_comment = Comment(
+        post_id=post_id,
+        author_id=current_user.id,
+        content=request.content,
+    )
+
+    db.add(new_comment)
+    await db.commit()
+    await db.refresh(new_comment)
+    return new_comment
+
+
+@router.get("/{post_id}/comments", response_model=CommentListResponse)
+async def get_comments(
+    post_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    db=Depends(get_db_session),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    offset = (page - 1) * page_size
+
+    comments_result = await db.execute(
+        select(Comment)
+        .where(Comment.post_id == post_id)
+        .order_by(Comment.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    comments = comments_result.scalars().all()
+
+    return CommentListResponse(
+        comments=comments,
+        count=len(comments),
+        page=int,
+        page_size=int,
+    )
