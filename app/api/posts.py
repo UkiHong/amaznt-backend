@@ -367,6 +367,6 @@ async def get_comments(
     return CommentListResponse(
         comments=comments,
         count=len(comments),
-        page=int,
-        page_size=int,
+        page=page,
+        page_size=page_size,
     )

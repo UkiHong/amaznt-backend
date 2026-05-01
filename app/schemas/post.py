@@ -114,3 +114,5 @@ class CommentResponse(BaseModel):
 class CommentListResponse(BaseModel):
     comments: list[CommentResponse]
     count: int
+    page: int
+    page_size: int
