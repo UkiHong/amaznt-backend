@@ -1,19 +1,96 @@
 from pydantic import ValidationError
 import pytest
-
+import anyio
+from app.database import database_engine
 from app.schemas.post import PostCreateRequest, PostUpdateRequest
+
+# TestClient is a dummy to send API requests to FastAPI
+from fastapi.testclient import TestClient
+from app.main import app
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()  # Load environment variables from .env file
+ADMIN_EMAIL = os.getenv("TEST_ADMIN_EMAIL")
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")
+
+
+# Close/dispose SQLAlchemy async database engine after each test.
+# Preventing errors between tests
+@pytest.fixture(autouse=True)
+def dispose_database_engine_after_test():
+    yield
+    anyio.run(database_engine.dispose)
+
+
+# token function for use in post tests.
+# Use for tests when authorized user is required.
+def make_auth_headers(client: TestClient) -> dict:
+    login_response = client.post(
+        "/auth/login",
+        data={"username": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json().get("access_token")
+    assert access_token is not None
+
+    return {"Authorization": f"Bearer {access_token}"}
 
 
 def test_create_post_without_token_returns_401():
-    pass
+    with TestClient(app) as client:
+        response = client.post(
+            "/posts",
+            json={
+                "title": "Test Post",
+                "product_name": "Test Product",
+                "price_paid": 19.99,
+                "fail_reason": "It broke after one use",
+                "platform": "Amazon",
+                "category": "Electronics",
+                "value_regret_score": 4,
+                "description_mismatch_score": 3,
+                "quality_disappointment_score": 2,
+                "funniness_score": 5,
+                "anger_score": 1,
+            },
+        )
+    assert response.status_code == 401
 
 
 def test_create_post_with_token_returns_201():
-    pass
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        response = client.post(
+            "/posts",
+            headers=auth_headers,
+            json={
+                "title": "Test Post with Token",
+                "product_name": "Test Product",
+                "price_paid": 19.99,
+                "fail_reason": "It broke after one use",
+                "platform": "Amazon",
+                "category": "Electronics",
+                "value_regret_score": 4,
+                "description_mismatch_score": 3,
+                "quality_disappointment_score": 2,
+                "funniness_score": 5,
+                "anger_score": 1,
+            },
+        )
+    assert response.status_code == 201
 
 
 def test_get_posts_returns_200():
-    pass
+    with TestClient(app) as client:
+        response = client.get("/posts")
+    assert response.status_code == 200
+
+    assert "posts" in response.json()
+    assert "count" in response.json()
+    assert "page" in response.json()
+    assert "page_size" in response.json()
 
 
 def test_get_post_returns_created_post():
@@ -21,7 +98,10 @@ def test_get_post_returns_created_post():
 
 
 def test_get_missing_post_returns_404():
-    pass
+    with TestClient(app) as client:
+        response = client.get("/posts/999999")
+
+    assert response.status_code == 404
 
 
 def test_post_create_request_rejects_scores_outside_1_to_5():
