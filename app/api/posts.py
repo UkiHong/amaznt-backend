@@ -1,11 +1,14 @@
-from sqlalchemy import select
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from starlette import status
 
 from app.core.security import get_current_active_user
 from app.database import get_db_session
-from app.models.post import Comment, Post, ProductFailScore
+from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -17,6 +20,7 @@ from app.schemas.post import (
     CommentListResponse,
     CommentResponse,
     PostCreateRequest,
+    PostImageResponse,
     PostListResponse,
     PostResponse,
     PostUpdateRequest,
@@ -26,6 +30,20 @@ router = APIRouter(
     prefix="/posts",
     tags=["posts"],
 )
+
+
+MAX_IMAGES_PER_POST = 5
+MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_IMAGE_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
+
+MEDIA_ROOT = Path("media")
+POST_IMAGE_DIR = MEDIA_ROOT / "post-images"
 
 
 @router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
@@ -338,6 +356,7 @@ async def create_comment(
     return new_comment
 
 
+# GET all comments for {post_id} post
 @router.get("/{post_id}/comments", response_model=CommentListResponse)
 async def get_comments(
     post_id: int,
@@ -370,3 +389,102 @@ async def get_comments(
         page=page,
         page_size=page_size,
     )
+
+
+# Posting images
+@router.post(
+    "/{post_id}/images",
+    response_model=PostImageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_post_image(
+    post_id: int,
+    file: UploadFile = File(
+        ...
+    ),  # request from a user when uploading files, "..." means file is mandatory.
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to upload images for this post",
+        )
+
+    # Limit image upload counts up to 5.
+    image_count_result = await db.execute(
+        select(func.count(PostImage.id)).where(PostImage.post_id == post_id)
+    )
+    image_count = image_count_result.scalar_one()
+    if image_count >= MAX_IMAGES_PER_POST:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A post can have up to 5 images.",
+        )
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required."
+        )
+
+    file_extension = Path(
+        file.filename
+    ).suffix.lower()  # lower() is for accepting uppercase extensions ex) JPG.
+
+    if file_extension not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only jpg/jpeg/png/webp images are allowed.",
+        )
+
+    if file.content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only image/jpeg, image/png, and image/webp are allowed.",
+        )
+
+    file_bytes = await file.read()
+    file_size = len(file_bytes)
+
+    if file_size > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image size must be 5MB or less.",
+        )
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image file is empty."
+        )
+
+    # uuid4() is to make a unique file names.
+    stored_filename = f"{uuid4()}{file_extension}"
+
+    post_image_dir = POST_IMAGE_DIR / str(post_id)
+    post_image_dir.mkdir(parents=True, exist_ok=True)
+
+    stored_file_path = post_image_dir / stored_filename
+    stored_file_path.write_bytes(file_bytes)
+
+    new_image = PostImage(
+        post_id=post_id,
+        original_filename=file.filename,
+        stored_filename=stored_filename,
+        file_path=str(stored_file_path),
+        content_type=file.content_type,
+        file_size=file_size,
+    )
+
+    db.add(new_image)
+    await db.commit()
+    await db.refresh(new_image)
+    return new_image

@@ -116,3 +116,16 @@ class CommentListResponse(BaseModel):
     count: int
     page: int
     page_size: int
+
+
+# Image Schemas--------------------------------------------------------------------
+class PostImageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    post_id: int
+    original_filename: str
+    file_path: str
+    content_type: str
+    file_size: int
+    created_at: datetime
