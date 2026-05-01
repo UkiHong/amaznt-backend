@@ -57,3 +57,46 @@ class ProductFailScore(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("posts.id"), index=True, nullable=False
+    )
+    author_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), index=True, nullable=False
+    )
+    content: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class PostImage(Base):
+    __tablename__ = "post_images"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("posts.id"), index=True, nullable=False
+    )
+    original_filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    stored_filename: Mapped[str] = mapped_column(
+        String(500), unique=True, nullable=False
+    )
+    file_path: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
