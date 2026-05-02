@@ -555,8 +555,54 @@ async def delete_comment(
     if comment.author_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not allowed for deletion",
+            detail="Not authorized to delete this comment",
         )
 
     await db.delete(comment)
+    await db.commit()
+
+
+# Delete ONE image for now. could be expanded for bulk delete.
+@router.delete(
+    "/{post_id}/images/{image_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_image(
+    post_id: int,
+    image_id: int,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    image_result = await db.execute(
+        select(PostImage).where(
+            PostImage.id == image_id,
+            PostImage.post_id == post_id,
+        )
+    )
+    image = image_result.scalar_one_or_none()
+
+    if image is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this image",
+        )
+
+    image_path = Path(image.file_path)
+    image_path.unlink(missing_ok=True)
+
+    await db.delete(image)
     await db.commit()
