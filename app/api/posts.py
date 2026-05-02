@@ -519,3 +519,44 @@ async def get_post_images(
     )
     images = images_result.scalars().all()
     return images
+
+
+@router.delete(
+    "/{post_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_comment(
+    post_id: int,
+    comment_id: int,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    comment_result = await db.execute(
+        select(Comment).where(
+            Comment.id == comment_id,
+            Comment.post_id == post_id,
+        )
+    )
+    comment = comment_result.scalar_one_or_none()
+
+    if comment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found",
+        )
+
+    if comment.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed for deletion",
+        )
+
+    await db.delete(comment)
+    await db.commit()
