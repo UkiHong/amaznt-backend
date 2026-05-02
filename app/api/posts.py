@@ -172,6 +172,11 @@ async def get_post(
     )
     score = score_result.scalar_one_or_none()
 
+    images_result = await db.execute(
+        select(PostImage).where(PostImage.post_id == post_id)
+    )
+    images = images_result.scalars().all()
+
     return {
         "id": post.id,
         "author_id": post.author_id,
@@ -184,6 +189,7 @@ async def get_post(
         "category": post.category,
         "created_at": post.created_at,
         "score": score,
+        "images": images,
     }
 
 
@@ -391,7 +397,8 @@ async def get_comments(
     )
 
 
-# Posting images
+# Posting images / Limit a post can have up to 5 images, but the API itself only allow upload one file at once.
+# Need update for uploading 5 file at the same time.
 @router.post(
     "/{post_id}/images",
     response_model=PostImageResponse,
@@ -420,11 +427,11 @@ async def upload_post_image(
             detail="Not authorized to upload images for this post",
         )
 
-    # Limit image upload counts up to 5.
     image_count_result = await db.execute(
         select(func.count(PostImage.id)).where(PostImage.post_id == post_id)
     )
     image_count = image_count_result.scalar_one()
+    # Limit image upload counts up to 5.
     if image_count >= MAX_IMAGES_PER_POST:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -469,6 +476,8 @@ async def upload_post_image(
     # uuid4() is to make a unique file names.
     stored_filename = f"{uuid4()}{file_extension}"
 
+    # file is stored in local DB for now to avoid DB getting heavy.
+    # it's also easy to move them to S3 storage later.
     post_image_dir = POST_IMAGE_DIR / str(post_id)
     post_image_dir.mkdir(parents=True, exist_ok=True)
 
@@ -488,3 +497,25 @@ async def upload_post_image(
     await db.commit()
     await db.refresh(new_image)
     return new_image
+
+
+@router.get("/{post_id}/images", response_model=list[PostImageResponse])
+async def get_post_images(
+    post_id: int,
+    db=Depends(get_db_session),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    images_result = await db.execute(
+        select(PostImage)
+        .where(PostImage.post_id == post_id)
+        .order_by(PostImage.created_at.desc())
+    )
+    images = images_result.scalars().all()
+    return images

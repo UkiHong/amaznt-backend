@@ -55,6 +55,8 @@ class PostResponse(BaseModel):
 
     score: ProductFailScoreResponse | None = None
 
+    images: list[PostImageResponse] = []
+
 
 # getting a list of posts with count
 class PostListResponse(BaseModel):
