@@ -601,6 +601,7 @@ async def delete_image(
             detail="Not authorized to delete this image",
         )
 
+    # Deleting the image from local storage.
     image_path = Path(image.file_path)
     image_path.unlink(missing_ok=True)
 

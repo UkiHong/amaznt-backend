@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 ADMIN_EMAIL = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")
+TEST_DUMMY_EMAIL = os.getenv("TEST_DUMMY_EMAIL")
+TEST_DUMMY_PASSWORD = os.getenv("TEST_DUMMY_PASSWORD")
 
 
 # Close/dispose SQLAlchemy async database engine after each test.
@@ -26,10 +28,12 @@ def dispose_database_engine_after_test():
 
 # token function for use in post tests.
 # Use for tests when authorized user is required.
-def make_auth_headers(client: TestClient) -> dict:
+def make_auth_headers(
+    client: TestClient, email: str = ADMIN_EMAIL, password: str = ADMIN_PASSWORD
+) -> dict:
     login_response = client.post(
         "/auth/login",
-        data={"username": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+        data={"username": email, "password": password},
     )
     assert login_response.status_code == 200
     access_token = login_response.json().get("access_token")
@@ -59,27 +63,34 @@ def test_create_post_without_token_returns_401():
     assert response.status_code == 401
 
 
+def create_test_post(client: TestClient, headers: dict) -> int:
+    response = client.post(
+        "/posts",
+        headers=headers,
+        json={
+            "title": "Test Post with Token",
+            "product_name": "Test Product",
+            "price_paid": 19.99,
+            "fail_reason": "It broke after one use",
+            "platform": "Amazon",
+            "category": "Electronics",
+            "value_regret_score": 4,
+            "description_mismatch_score": 3,
+            "quality_disappointment_score": 2,
+            "funniness_score": 5,
+            "anger_score": 1,
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def test_create_post_with_token_returns_201():
     with TestClient(app) as client:
         auth_headers = make_auth_headers(client)
-        response = client.post(
-            "/posts",
-            headers=auth_headers,
-            json={
-                "title": "Test Post with Token",
-                "product_name": "Test Product",
-                "price_paid": 19.99,
-                "fail_reason": "It broke after one use",
-                "platform": "Amazon",
-                "category": "Electronics",
-                "value_regret_score": 4,
-                "description_mismatch_score": 3,
-                "quality_disappointment_score": 2,
-                "funniness_score": 5,
-                "anger_score": 1,
-            },
-        )
-    assert response.status_code == 201
+        # dummy_headers = make_auth_headers(client, TEST_DUMMY_EMAIL, TEST_DUMMY_PASSWORD)
+        post_id = create_test_post(client, auth_headers)
+        assert post_id is not None
 
 
 def test_get_posts_returns_200():
@@ -128,3 +139,6 @@ def test_post_update_request_allows_partial_update():
     assert request.title == "Updated title"
     assert request.product_name is None
     assert request.anger_score is None
+
+
+# Comment test --------------------------------------------------
