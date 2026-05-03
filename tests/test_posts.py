@@ -105,6 +105,24 @@ def test_get_posts_returns_200():
     assert "page_size" in response.json()
 
 
+def test_get_post_detail_includes_images():
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        post_id = create_test_post(client, auth_headers)
+        image_id = create_test_image(client, post_id, auth_headers)
+
+        response = client.get(f"/posts/{post_id}")
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+    images = response_data["images"]
+    image_ids = []
+    for image in images:
+        image_ids.append(image["id"])
+    assert image_id in image_ids
+
+
 def test_get_post_returns_created_post():
     pass
 
@@ -153,3 +171,79 @@ def create_test_comment(client: TestClient, post_id: int, headers: dict) -> int:
     )
     assert response.status_code == 201
     return response.json()["id"]
+
+
+def test_delete_comment_with_token_returns_204():
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        # dummy_headers = make_auth_headers(client, TEST_DUMMY_EMAIL, TEST_DUMMY_PASSWORD)
+        post_id = create_test_post(client, auth_headers)
+        comment_id = create_test_comment(client, post_id, auth_headers)
+
+        response = client.delete(
+            f"/posts/{post_id}/comments/{comment_id}",
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 204
+
+
+def test_delete_comment_by_non_author_returns_403():
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        dummy_headers = make_auth_headers(client, TEST_DUMMY_EMAIL, TEST_DUMMY_PASSWORD)
+        post_id = create_test_post(client, auth_headers)
+        comment_id = create_test_comment(client, post_id, auth_headers)
+
+        response = client.delete(
+            f"/posts/{post_id}/comments/{comment_id}",
+            headers=dummy_headers,
+        )
+
+    assert response.status_code == 403
+
+
+# Image test --------------------------------------------------
+# Helper function for creating a test image.
+def create_test_image(client: TestClient, post_id: int, headers: dict) -> int:
+    response = client.post(
+        f"/posts/{post_id}/images",
+        headers=headers,
+        files={
+            "file": (
+                "test.png",
+                b"fake image bytes",
+                "image/png",
+            ),
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def test_delete_image_with_token_returns_204():
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        post_id = create_test_post(client, auth_headers)
+        image_id = create_test_image(client, post_id, auth_headers)
+
+        response = client.delete(
+            f"/posts/{post_id}/images/{image_id}",
+            headers=auth_headers,
+        )
+    assert response.status_code == 204
+
+
+def test_delete_image_by_non_author_returns_403():
+    with TestClient(app) as client:
+        auth_headers = make_auth_headers(client)
+        dummy_headers = make_auth_headers(client, TEST_DUMMY_EMAIL, TEST_DUMMY_PASSWORD)
+        post_id = create_test_post(client, auth_headers)
+        image_id = create_test_image(client, post_id, auth_headers)
+
+        response = client.delete(
+            f"/posts/{post_id}/images/{image_id}",
+            headers=dummy_headers,
+        )
+
+    assert response.status_code == 403
