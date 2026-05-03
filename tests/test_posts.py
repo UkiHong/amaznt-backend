@@ -63,6 +63,7 @@ def test_create_post_without_token_returns_401():
     assert response.status_code == 401
 
 
+# Helper function to create a test post.
 def create_test_post(client: TestClient, headers: dict) -> int:
     response = client.post(
         "/posts",
@@ -142,3 +143,13 @@ def test_post_update_request_allows_partial_update():
 
 
 # Comment test --------------------------------------------------
+def create_test_comment(client: TestClient, post_id: int, headers: dict) -> int:
+    response = client.post(
+        f"/posts/{post_id}/comments",
+        headers=headers,
+        json={
+            "content": "Test Comment by Dummy",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
