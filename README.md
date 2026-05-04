@@ -58,23 +58,19 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | User registration | Done | Password hashing included |
 | Login flow | Done | JWT access token is issued |
 | `/auth/me` endpoint | Done | Uses `OAuth2PasswordBearer`, `get_current_user()`, `get_current_active_user()` |
-
-### In Progress
-
-| Feature | Status | Notes |
-|---|---|---|
-| Auth endpoint tests | In progress | pytest skeleton next |
-| README and API docs | In progress | Project documentation is being cleaned up |
-| Product Fail Post CRUD | Next | Week 4 feature: create, read, update, delete failed purchase posts |
-| Buyer Regret Score v1 | Next | Week 4 feature: calculate and store the first weighted score version |
+| Product Fail Post CRUD | Done | Authenticated users can create, read, update, and delete failed purchase posts |
+| Buyer Regret Score v1 | Done | Weighted score calculation with normalized 1-5 inputs and grade output |
+| Comment APIs | Done | Users can create, list, and delete comments with author authorization |
+| Local image upload | Done | Post authors can upload image evidence to local `media/` storage |
+| Image retrieval | Done | Post detail responses include images, and images can be listed separately |
+| Static media serving | Done | Uploaded files are served through `/media/...` using FastAPI `StaticFiles` |
+| Image deletion | Done | Post authors can delete image metadata and local image files |
+| Core post/comment/image tests | In progress | Main success and authorization cases are covered; edge cases are still being expanded |
 
 ### Planned
 
 | Feature | Status | Notes |
 |---|---|---|
-| Product Fail Post model | Planned | Main content layer for failed purchase reviews |
-| Product Fail Score model | Planned | Stores Buyer Regret Score values and calculation version |
-| Comment CRUD | Planned | User discussion layer |
 | Reaction system | Planned | Community feedback for v2 score calculation |
 | Ranking / popular posts | Planned | Community engagement layer |
 | Admin / moderation features | Planned | Reporting and control |
@@ -100,6 +96,115 @@ This project separates ORM models from Pydantic schemas so database objects and 
 
 ## Buyer Regret Score
 
-Buyer Regret Score is the main feature of this project. In MVP v1, the score will be calculated from user-entered regret inputs such as value regret, description mismatch, quality disappointment, funniness, and anger.
+Buyer Regret Score is the main feature of this project. In MVP v1, the score is calculated from user-entered regret inputs:
 
-The first version will use a simple weighted formula in Python and store the result with a calculation version, so future score formulas can be added without losing track of how older scores were created.
+- `value_regret_score`
+- `description_mismatch_score`
+- `quality_disappointment_score`
+- `funniness_score`
+- `anger_score`
+
+Each input is accepted on a 1-5 scale and normalized to a 20-100 scale.
+
+```text
+1 -> 20
+2 -> 40
+3 -> 60
+4 -> 80
+5 -> 100
+```
+
+The v1 formula is:
+
+```text
+final_score =
+  value_regret_score * 0.25
++ description_mismatch_score * 0.30
++ quality_disappointment_score * 0.25
++ funniness_score * 0.10
++ anger_score * 0.10
+```
+
+The calculated score is stored in `product_fail_scores` with a grade and `calculation_version`, so future score formulas can be introduced without losing track of how older scores were calculated.
+
+## API Summary
+
+### Auth
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/auth/register-test` | Register a new user |
+| `POST` | `/auth/login` | Log in and receive a JWT access token |
+| `GET` | `/auth/me` | Get the current authenticated user |
+
+### Posts
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/posts` | Create a failed purchase post and calculate Buyer Regret Score |
+| `GET` | `/posts` | List posts with pagination |
+| `GET` | `/posts/{post_id}` | Get one post with score and uploaded images |
+| `PATCH` | `/posts/{post_id}` | Update a post and optionally recalculate score |
+| `DELETE` | `/posts/{post_id}` | Delete a post owned by the current user |
+
+### Comments
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/posts/{post_id}/comments` | Create a comment on a post |
+| `GET` | `/posts/{post_id}/comments` | List comments for a post |
+| `DELETE` | `/posts/{post_id}/comments/{comment_id}` | Delete a comment owned by the current user |
+
+### Images
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/posts/{post_id}/images` | Upload one image for a post owned by the current user |
+| `GET` | `/posts/{post_id}/images` | List uploaded images for a post |
+| `DELETE` | `/posts/{post_id}/images/{image_id}` | Delete one image from a post owned by the current user |
+| `GET` | `/media/post-images/{post_id}/{stored_filename}` | Serve an uploaded image file through `StaticFiles` |
+
+## Local Image Upload Policy
+
+Images are stored locally for the MVP. The database stores image metadata, while the actual files are saved under the `media/` directory.
+
+```text
+media/post-images/{post_id}/{stored_filename}
+```
+
+Current upload rules:
+
+- One image per request
+- Up to 5 images per post
+- Allowed extensions: `.jpg`, `.jpeg`, `.png`, `.webp`
+- Allowed content types: `image/jpeg`, `image/png`, `image/webp`
+- Max file size: 5MB
+- Empty files are rejected
+- Only the post author can upload or delete images
+
+Uploaded files are served locally through FastAPI `StaticFiles`:
+
+```text
+/media/post-images/{post_id}/{stored_filename}
+```
+
+This local media setup is for MVP development. In a production version, this responsibility should move to object storage such as AWS S3.
+
+## Testing
+
+The project uses `pytest` with FastAPI `TestClient`.
+
+Current test coverage includes:
+
+- post creation with and without authentication
+- Buyer Regret Score validation
+- comment deletion by owner and non-author
+- image upload helper flow
+- image deletion by owner and non-author
+- post detail response including uploaded images
+
+Run tests with:
+
+```bash
+pytest
+```
