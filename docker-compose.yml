@@ -1,0 +1,49 @@
+#Define the containers that make up the local MVP environment.
+services:
+  app:
+    #Build the FastAPI image from the Dockerfile in this directory.
+    build: .
+    container_name: amaznt-backend-app
+
+    #Map host port 8000 to the app container's port 8000.
+    ports:
+      - "8000:8000"
+
+    #Load shared app settings from .env at container runtime.
+    env_file:
+      - .env
+
+    #Override DATABASE_URL so the app connects to the postgres service.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://amaznt_user:amaznt_password@postgres:5432/amaznt
+
+    #Keep uploaded media files on the local filesystem.
+    volumes:
+      - ./media:/app/media
+
+    #Start the database container before starting the app container.
+    depends_on:
+      - postgres
+
+  postgres:
+    #Use the official PostgreSQL image for the local database server.
+    image: postgres:16
+    container_name: amaznt-backend-postgres
+
+    #Create the initial database, user, and password on first startup.
+    environment:
+      POSTGRES_USER: amaznt_user
+      POSTGRES_PASSWORD: amaznt_password
+      POSTGRES_DB: amaznt
+
+    #Expose PostgreSQL on localhost:5432 for local inspection tools.
+    ports:
+      - "5432:5432"
+
+    #Persist PostgreSQL data outside the container lifecycle.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+#Declare Docker-managed volumes used by services above.
+volumes:
+  postgres_data:
