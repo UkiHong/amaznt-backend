@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 #Copy the FastAPI source package into the image.
 COPY app ./app
 
+# Copy Alembic configuration and migration scripts for database setup.
+COPY alembic.ini .
+COPY alembic ./alembic
+
 #Ensure the local media directory exists for uploaded post images.
 RUN mkdir -p media/post-images
 
