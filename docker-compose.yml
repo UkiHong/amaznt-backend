@@ -15,7 +15,7 @@ services:
 
     #Override DATABASE_URL so the app connects to the postgres service.
     environment:
-      DATABASE_URL: postgresql+asyncpg://amaznt_user:amaznt_password@postgres:5432/amaznt
+      DATABASE_URL: ${DOCKER_DATABASE_URL}
 
     #Keep uploaded media files on the local filesystem.
     volumes:
@@ -31,10 +31,10 @@ services:
     container_name: amaznt-backend-postgres
 
     #Create the initial database, user, and password on first startup.
-    environment:
-      POSTGRES_USER: amaznt_user
-      POSTGRES_PASSWORD: amaznt_password
-      POSTGRES_DB: amaznt
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
 
     #Expose PostgreSQL on localhost:5432 for local inspection tools.
     ports:
