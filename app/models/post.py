@@ -40,7 +40,7 @@ class ProductFailScore(Base):
     __tablename__ = "product_fail_scores"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     post_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("posts.id"), unique=True, nullable=False
+        Integer, ForeignKey("posts.id", ondelete="CASCADE"), unique=True, nullable=False
     )
 
     value_regret_score: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -63,7 +63,7 @@ class Comment(Base):
     __tablename__ = "comments"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     post_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("posts.id"), index=True, nullable=False
+        Integer, ForeignKey("posts.id", ondelete="CASCADE"), index=True, nullable=False
     )
     author_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), index=True, nullable=False
@@ -86,7 +86,7 @@ class PostImage(Base):
     __tablename__ = "post_images"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     post_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("posts.id"), index=True, nullable=False
+        Integer, ForeignKey("posts.id", ondelete="CASCADE"), index=True, nullable=False
     )
     original_filename: Mapped[str] = mapped_column(String(500), nullable=False)
     stored_filename: Mapped[str] = mapped_column(

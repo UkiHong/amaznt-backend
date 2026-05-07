@@ -316,14 +316,12 @@ async def delete_post(
             detail="Not authorized to delete this post",
         )
 
-    # Deleting the associated score first, which is related to Post model with a foreign key.
-    # could be refactored with cascade delete later?
-    score_result = await db.execute(
-        select(ProductFailScore).where(ProductFailScore.post_id == post_id)
+    image_result = await db.execute(
+        select(PostImage).where(PostImage.post_id == post_id)
     )
-    score = score_result.scalar_one_or_none()
-    if score:
-        await db.delete(score)
+    images = image_result.scalars().all()
+    for image in images:
+        Path(image.file_path).unlink(missing_ok=True)
 
     await db.delete(post)
     await db.commit()
