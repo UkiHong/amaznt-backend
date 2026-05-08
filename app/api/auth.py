@@ -23,11 +23,6 @@ router = APIRouter(
 )
 
 
-@router.get("/register-test")
-def auth_check():
-    return {"status": "ok"}
-
-
 # Register endpoint for testing the registration request body, step 2 for testing the registration endpoint with DB interaction and password hashing
 @router.post(
     "/register-test",
