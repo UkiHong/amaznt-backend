@@ -1,4 +1,4 @@
-# Amaznt Backend
+# Amazn't Backend
 
 Backend API for **Amazn't**, a community platform where users share, browse, and discuss failed or hilariously bad purchases.  
 The core idea is simple: turn regrettable shopping decisions into searchable, discussable community content with a **Buyer Regret Score**.
