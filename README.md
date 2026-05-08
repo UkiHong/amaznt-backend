@@ -261,6 +261,13 @@ The calculated score is stored in `product_fail_scores` with a grade and `calcul
 
 ## API Summary
 
+### System
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Root endpoint for basic app status |
+| `GET` | `/health` | Health check endpoint |
+
 ### Auth
 
 | Method | Path | Description |
