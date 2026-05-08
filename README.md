@@ -272,7 +272,7 @@ The calculated score is stored in `product_fail_scores` with a grade and `calcul
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/auth/register-test` | Register a new user |
+| `POST` | `/auth/register` | Register a new user |
 | `POST` | `/auth/login` | Log in and receive a JWT access token |
 | `GET` | `/auth/me` | Get the current authenticated user |
 
