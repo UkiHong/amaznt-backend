@@ -5,8 +5,7 @@ The core idea is simple: turn regrettable shopping decisions into searchable, di
 
 ## Overview
 
-Amaznt is a FastAPI backend project built to go beyond basic CRUD practice.  
-It focuses on real backend concerns such as authentication, async database access, migrations, testing, caching, deployment, and performance tuning through a structured 16-week roadmap.
+Amaznt started as a CRUD practice project, but I wanted it to cover the backend work that tutorials often skip: authentication, async database access, migrations, Docker setup, testing, and debugging real issues.
 
 ## Why I Built This
 
@@ -26,7 +25,7 @@ I wanted to build a backend project that also covers the parts that matter in pr
 |---|---|---|---|
 | MVP v1 | Build the foundation | FastAPI setup, PostgreSQL, SQLAlchemy, Alembic, User model, registration, login, `/auth/me`, Product Fail Post CRUD, Buyer Regret Score v1, local run, smoke tests | A working backend with authentication, post CRUD, and regret score calculation |
 | MVP v2 | Expand community behavior | Comments, reactions, Buyer Regret Score v2, ranking, reports, moderation, image upload, stronger tests | A more interactive community backend with richer user behavior |
-| MVP v3 | Production readiness | Redis cache, rate limiting, Docker, GitHub Actions, deployment, performance tuning, documentation polish | A portfolio-ready backend with operational and performance maturity |
+| MVP v3 | Production readiness | Redis cache, rate limiting, GitHub Actions, deployment, performance tuning, documentation polish | A backend that is easier to run, test, deploy, and explain in a portfolio review |
 
 ## Tech Stack
 
@@ -42,7 +41,8 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Authentication | JWT + OAuth2PasswordBearer |
 | Password Hashing | pwdlib with Argon2 |
 | API Docs | Swagger / OpenAPI |
-| Planned Infra | Docker, GitHub Actions, AWS EC2, Nginx, HTTPS |
+| Containerization / Local Dev | Docker, Docker Compose |
+| Planned Infra | GitHub Actions, AWS EC2, Nginx, HTTPS |
 
 ## Current Features
 
@@ -66,6 +66,9 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Static media serving | Done | Uploaded files are served through `/media/...` using FastAPI `StaticFiles` |
 | Image deletion | Done | Post authors can delete image metadata and local image files |
 | Core post/comment/image tests | In progress | Main success and authorization cases are covered; edge cases are still being expanded |
+| Docker local environment | Done | FastAPI app and PostgreSQL run together with Docker Compose |
+| Docker migration workflow | Done | Alembic can run inside the app container against Docker PostgreSQL |
+
 
 ### Planned
 
@@ -75,7 +78,6 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Ranking / popular posts | Planned | Community engagement layer |
 | Admin / moderation features | Planned | Reporting and control |
 | Redis caching and rate limiting | Planned | Performance and abuse control |
-| Docker-based local environment | Planned | Dev consistency |
 | GitHub Actions CI | Planned | Automated checks |
 | EC2 + Nginx + HTTPS | Planned | Deployment and production setup |
 | Performance analysis | Planned | Query optimization and tuning |
@@ -92,7 +94,120 @@ app/
 └── database/
 ```
 
-This project separates ORM models from Pydantic schemas so database objects and API contracts stay clear and maintainable.
+This keeps database models and API request/response shapes from getting mixed together.
+
+## Docker Local Setup
+
+The recommended local MVP setup uses Docker Compose to run the FastAPI app and PostgreSQL together.
+
+### 1. Create environment file
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Update values in `.env` if needed.
+
+### 2. Start the app and database
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+```text
+amaznt-backend-app       FastAPI app container
+amaznt-backend-postgres  PostgreSQL 16 container
+```
+
+The API will be available at:
+
+```text
+http://localhost:8000
+```
+
+Swagger docs:
+
+```text
+http://localhost:8000/docs
+```
+
+### 3. Run database migrations
+
+In another terminal, run:
+
+```bash
+docker compose exec app alembic upgrade head
+```
+
+### 4. Verify the app
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected result:
+
+```json
+{"status":"ok"}
+```
+
+### 5. Stop containers
+
+```bash
+docker compose down
+```
+
+PostgreSQL data is stored in the Docker volume `postgres_data`, so database data persists across normal container restarts.
+
+## Environment Variables
+
+This project uses `.env` for local configuration. Start from `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Important variables:
+
+| Variable | Purpose |
+|---|---|
+| `APP_NAME` | FastAPI application title |
+| `DEBUG` | Enables debug mode when set to `true` |
+| `SECRET_KEY` | JWT signing secret |
+| `ALGORITHM` | JWT algorithm, usually `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT access token lifetime |
+| `DATABASE_URL` | Local database URL used when running the app outside Docker |
+| `POSTGRES_USER` | PostgreSQL user created by Docker Compose |
+| `POSTGRES_PASSWORD` | PostgreSQL password created by Docker Compose |
+| `POSTGRES_DB` | PostgreSQL database name created by Docker Compose |
+| `DOCKER_DATABASE_URL` | Database URL used by the app container to connect to the `postgres` service |
+
+### Local vs Docker database URL
+
+When running outside Docker, the app can use a local PostgreSQL URL:
+
+```text
+postgresql+asyncpg://uki@localhost:5432/amaznt
+```
+
+When running inside Docker Compose, the app must use the Compose service name:
+
+```text
+postgresql+asyncpg://amaznt_user:amaznt_password@postgres:5432/amaznt
+```
+
+Inside a Docker container, `localhost` means the container itself. To connect from the app container to the PostgreSQL container, use the service name `postgres`.
+
+Docker Compose injects the Docker database URL into the app container:
+
+```yaml
+environment:
+  DATABASE_URL: ${DOCKER_DATABASE_URL}
+```
 
 ## Buyer Regret Score
 
@@ -114,16 +229,33 @@ Each input is accepted on a 1-5 scale and normalized to a 20-100 scale.
 5 -> 100
 ```
 
-The v1 formula is:
+The v1 formula currently implemented in `app/services/product_fail_score_service.py` is:
 
 ```text
 final_score =
-  value_regret_score * 0.25
-+ description_mismatch_score * 0.30
-+ quality_disappointment_score * 0.25
+  value_regret_score * 0.30
++ description_mismatch_score * 0.25
++ quality_disappointment_score * 0.20
 + funniness_score * 0.10
-+ anger_score * 0.10
++ anger_score * 0.15
 ```
+
+Current calculation version:
+
+```text
+fail_score_v1
+```
+
+Grades:
+
+| Score range | Grade |
+|---|---|
+| 0-20 | Level 1 - Somehow Fine |
+| 21-40 | Level 2 - Mild Regret |
+| 41-60 | Level 3 - Wallet Bruised |
+| 61-80 | Level 4 - Proper Letdown |
+| 81-95 | Level 5 - Absolute Rubbish |
+| 96-100 | Level 6 - Hall of Shame |
 
 The calculated score is stored in `product_fail_scores` with a grade and `calculation_version`, so future score formulas can be introduced without losing track of how older scores were calculated.
 
@@ -208,3 +340,49 @@ Run tests with:
 ```bash
 pytest
 ```
+
+## Troubleshooting Notes
+
+### 1. Alembic in Docker connected to the wrong database
+
+**Problem**  
+Alembic failed when I tried to run migrations inside the Docker app container. It was still trying to connect to a local `localhost` database.
+
+**Cause**  
+Inside Docker, `localhost` means the current container itself. Since PostgreSQL runs in a separate `postgres` container, the app container has to connect through the Compose service name `postgres`.
+
+**Fix**  
+I updated `alembic/env.py` so Alembic reads `DATABASE_URL` from the runtime environment. The app still uses `asyncpg`, but Alembic converts that URL to `psycopg2` because the current migration setup runs through a sync SQLAlchemy engine.
+
+### 2. `users.created_at` failed because the database default was missing
+
+**Problem**  
+User registration failed because `users.created_at` was `NOT NULL`, but PostgreSQL did not have a database-level default for that column.
+
+**Cause**  
+The SQLAlchemy model had `server_default=func.now()`, but the migration that had already been applied to the database did not create the same default. The model and the real database schema had drifted.
+
+**Fix**  
+I added a new Alembic migration to set `users.created_at` to `server_default=now()`. I did this as a new migration instead of editing old migration history.
+
+### 3. Post deletion failed because child rows still referenced `posts.id`
+
+**Problem**  
+`DELETE /posts/{post_id}` failed with a foreign key violation. The post still had related rows in `product_fail_scores`, `comments`, and `post_images`.
+
+**Cause**  
+Those tables referenced `posts.id`, but the existing foreign key constraints did not have `ON DELETE CASCADE`. PostgreSQL correctly blocked the parent row from being deleted while child rows still pointed to it.
+
+**Fix**  
+I added `ondelete="CASCADE"` to the SQLAlchemy models and created a migration that drops and recreates the existing PostgreSQL foreign key constraints with `ON DELETE CASCADE`. The API still deletes physical image files itself because database cascade only removes database rows, not files on disk.
+
+### 4. Auth smoke tests used different data after switching to Docker
+
+**Problem**  
+A login that worked against the local database returned `401 Unauthorized` after switching to the Docker environment.
+
+**Cause**  
+The local PostgreSQL database and the Docker PostgreSQL database are separate databases. A test user created in the local DB does not automatically exist in the Docker DB.
+
+**Fix**  
+For Docker-based smoke tests, I create or register test users in the Docker PostgreSQL database instead of assuming local DB data exists there.
