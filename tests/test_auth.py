@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+import pytest
+
 from app.main import app
 
 client = TestClient(app)
@@ -10,6 +12,7 @@ def test_health_returns_200():
     assert response.json() == {"status": "ok"}
 
 
+@pytest.mark.skip(reason="TODO: implement successful login test")
 def test_login_success():
     pass
 
@@ -33,10 +36,12 @@ def test_login_with_wrong_credentials_returns_401():
     assert response.status_code == 401
 
 
+@pytest.mark.skip(reason="TODO: implement authenticated /auth/me test")
 def test_me_returns_current_active_user():
     pass
 
 
+@pytest.mark.skip(reason="TODO: implement inactive user fixture/test")
 def test_me_with_inactive_user_returns_403():
     pass
 

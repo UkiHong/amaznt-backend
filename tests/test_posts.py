@@ -10,7 +10,6 @@ from app.main import app
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()  # Load environment variables from .env file
 ADMIN_EMAIL = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")
@@ -123,6 +122,7 @@ def test_get_post_detail_includes_images():
     assert image_id in image_ids
 
 
+@pytest.mark.skip(reason="TODO: implement post detail response test")
 def test_get_post_returns_created_post():
     pass
 
