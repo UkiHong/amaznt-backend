@@ -9,6 +9,8 @@ from starlette import status
 from app.core.security import get_current_active_user
 from app.database import get_db_session
 from app.models.post import Comment, Post, PostImage, ProductFailScore
+from app.models.reaction import PostReaction, ReactionType
+from app.schemas.reaction import ReactionToggleResponse
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -605,3 +607,54 @@ async def delete_image(
 
     await db.delete(image)
     await db.commit()
+
+
+# ------------------------REACTION--------------------------------------
+@router.post(
+    "/{post_id}/reactions/{reaction_type}",
+    response_model=ReactionToggleResponse,
+)
+async def post_reaction(
+    post_id: int,
+    reaction_type: ReactionType,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    if post.author_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to react to your own post",
+        )
+
+    existing_reaction_result = await db.execute(
+        select(PostReaction).where(
+            PostReaction.post_id == post_id,
+            PostReaction.user_id == current_user.id,
+        )
+    )
+    existing_reaction = existing_reaction_result.scalar_one_or_none()
+
+    if existing_reaction is None:
+        new_reaction = PostReaction(
+            user_id=current_user.id,
+            post_id=post_id,
+            reaction_type=reaction_type,
+        )
+
+        db.add(new_reaction)
+        await db.commit()
+
+        return {
+            "status": "created",
+            "post_id": post_id,
+            "reaction_type": reaction_type,
+        }
