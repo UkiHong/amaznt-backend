@@ -247,3 +247,167 @@ def test_delete_image_by_non_author_returns_403():
         )
 
     assert response.status_code == 403
+
+
+# Reaction Test ----------------------------------------------------------------
+
+
+# # Helper def when user request to react to a post
+def react_to_post(client: TestClient, post_id: int, headers: dict, reaction_type: str):
+    return client.post(
+        f"/posts/{post_id}/reactions/{reaction_type}",
+        headers=headers,
+    )
+
+
+def test_same_reaction_toggles_off():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        reactor_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+        post_id = create_test_post(client, author_headers)
+
+        first_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "HELPFUL",
+        )
+
+        second_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "HELPFUL",
+        )
+
+        assert first_response.status_code == 200
+        assert first_response.json()["status"] == "created"
+        assert first_response.json()["reaction_type"] == "HELPFUL"
+
+        assert second_response.status_code == 200
+        assert second_response.json()["status"] == "deleted"
+        assert second_response.json()["reaction_type"] is None
+
+
+def test_different_reaction_updates_existing_reaction():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        reactor_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+        post_id = create_test_post(client, author_headers)
+
+        first_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "HELPFUL",
+        )
+
+        second_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "SAME_HERE",
+        )
+
+        assert first_response.status_code == 200
+        assert first_response.json()["status"] == "created"
+        assert first_response.json()["reaction_type"] == "HELPFUL"
+
+        assert second_response.status_code == 200
+        assert second_response.json()["status"] == "updated"
+        assert second_response.json()["reaction_type"] == "SAME_HERE"
+
+
+def test_author_cannot_react_to_own_post():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+
+        post_id = create_test_post(client, author_headers)
+
+        my_reaction = react_to_post(
+            client,
+            post_id,
+            author_headers,
+            "HELPFUL",
+        )
+
+        assert my_reaction.status_code == 403
+
+
+def test_post_detail_includes_reaction_summary_for_anonymous_user():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+
+        post_id = create_test_post(client, author_headers)
+
+        # A different user reacts to the post.
+        reactor_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+
+        # Anonymous users can still read post detail.
+        # No Authorization header is sent here.
+        react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            reaction_type="HELPFUL",
+        )
+
+        response = client.get(f"/posts/{post_id}")
+
+        assert response.status_code == 200
+
+        response_data = response.json()
+        reaction_summary = response_data["reaction_summary"]
+
+        # Reaction summary is public aggregate data.
+        assert reaction_summary["helpful_count"] == 1
+        assert reaction_summary["same_here_count"] == 0
+        assert reaction_summary["saved_my_money_count"] == 0
+
+        # Anonymous users do not have a personal reaction state.
+        assert response_data["my_reaction"] is None
+
+
+def test_post_detail_includes_my_reaction_for_logged_in_user():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        post_id = create_test_post(client, author_headers)
+
+        # This user will check if my_reaction shows when getting the post
+        reactor_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+
+        react_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "SAME_HERE",
+        )
+        assert react_response.status_code == 200
+
+        response = client.get(
+            f"/posts/{post_id}",
+            headers=reactor_headers,
+        )
+        assert response.status_code == 200
+
+        response_data = response.json()
+        reaction_summary = response_data["reaction_summary"]
+
+        assert response_data["my_reaction"] == "SAME_HERE"
+        assert reaction_summary["same_here_count"] == 1
