@@ -196,6 +196,18 @@ async def get_post(
         elif reaction_type == ReactionType.SAVED_MY_MONEY:
             reaction_summary.saved_my_money_count = count
 
+    my_reaction = None
+    if current_user is not None:
+        my_reaction_result = await db.execute(
+            select(PostReaction).where(
+                PostReaction.post_id == post_id,
+                PostReaction.user_id == current_user.id,
+            )
+        )
+        my_reaction_row = my_reaction_result.scalar_one_or_none()
+        if my_reaction_row is not None:
+            my_reaction = my_reaction_row.reaction_type
+
     return {
         "id": post.id,
         "author_id": post.author_id,
@@ -210,6 +222,7 @@ async def get_post(
         "score": score,
         "images": images,
         "reaction_summary": reaction_summary,
+        "my_reaction": my_reaction,
     }
 
 
