@@ -643,6 +643,7 @@ async def post_reaction(
     )
     existing_reaction = existing_reaction_result.scalar_one_or_none()
 
+    # Creating a reaction when there's no reaction
     if existing_reaction is None:
         new_reaction = PostReaction(
             user_id=current_user.id,
@@ -659,6 +660,7 @@ async def post_reaction(
             "reaction_type": reaction_type,
         }
 
+    # Deleting a reaction when there's same reaction
     if existing_reaction.reaction_type == reaction_type:
         await db.delete(existing_reaction)
         await db.commit()
@@ -668,3 +670,13 @@ async def post_reaction(
             "post_id": post_id,
             "reaction_type": None,
         }
+
+    # Updating a reaction when a different reaction is posted
+    existing_reaction.reaction_type = reaction_type
+    await db.commit()
+
+    return {
+        "status": "updated",
+        "post_id": post_id,
+        "reaction_type": reaction_type,
+    }
