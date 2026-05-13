@@ -11,7 +11,6 @@ from fastapi.security import OAuth2PasswordBearer
 from app.database import get_db_session
 from app.models.user import User
 
-
 password_hash = PasswordHash.recommended()
 
 
@@ -51,6 +50,12 @@ def create_access_token(data: dict) -> str:
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+# When user is not logged in, it returns "token = None" to let unlogged user can still see post.
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="auth/login",
+    auto_error=False,
+)
 
 
 # Dependency function to get the current user from the JWT token.
@@ -104,3 +109,46 @@ async def get_current_active_user(
             detail="Inactive user",
         )
     return current_user
+
+
+async def get_optional_current_user(
+    token: str = Depends(optional_oauth2_scheme),
+    db=Depends(get_db_session),
+) -> User | None:
+    if token is None:
+        return None
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    # Why decoding is needed: to verify the encoded token is valid and matched with DB.
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
+        )
+        email = payload.get("sub")
+
+        if email is None:
+            raise credentials_exception
+
+    except JWTError:
+        raise credentials_exception
+
+    result = await db.execute(select(User).where(User.email == email))
+    existing_user = result.scalar_one_or_none()
+
+    if not existing_user:
+        raise credentials_exception
+
+    if not existing_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive User",
+        )
+
+    return existing_user

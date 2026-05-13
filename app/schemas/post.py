@@ -4,6 +4,9 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.reaction import ReactionType
+from app.schemas.reaction import ReactionSummaryResponse
+
 
 class PostCreateRequest(BaseModel):
     title: str
@@ -56,6 +59,9 @@ class PostResponse(BaseModel):
     score: ProductFailScoreResponse | None = None
 
     images: list[PostImageResponse] = []
+
+    reaction_summary: ReactionSummaryResponse | None = None
+    my_reaction: ReactionType | None = None
 
 
 # getting a list of posts with count

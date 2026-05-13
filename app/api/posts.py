@@ -6,11 +6,11 @@ from sqlalchemy import func, select
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from starlette import status
 
-from app.core.security import get_current_active_user
+from app.core.security import get_current_active_user, get_optional_current_user
 from app.database import get_db_session
 from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.models.reaction import PostReaction, ReactionType
-from app.schemas.reaction import ReactionToggleResponse
+from app.schemas.reaction import ReactionToggleResponse, ReactionSummaryResponse
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -159,6 +159,7 @@ async def get_posts(
 async def get_post(
     post_id: int,
     db=Depends(get_db_session),
+    current_user=Depends(get_optional_current_user),
 ):
     result = await db.execute(select(Post).where(Post.id == post_id))
     post = result.scalar_one_or_none()
@@ -179,6 +180,22 @@ async def get_post(
     )
     images = images_result.scalars().all()
 
+    reaction_count_result = await db.execute(
+        select(PostReaction.reaction_type, func.count(PostReaction.id))
+        .where(PostReaction.post_id == post_id)
+        .group_by(PostReaction.reaction_type)
+    )
+    reaction_counts = reaction_count_result.all()
+
+    reaction_summary = ReactionSummaryResponse()
+    for reaction_type, count in reaction_counts:
+        if reaction_type == ReactionType.HELPFUL:
+            reaction_summary.helpful_count = count
+        elif reaction_summary == ReactionType.SAME_HERE:
+            reaction_summary.same_here_count = count
+        elif reaction_summary == ReactionType.SAVED_MY_MONEY:
+            reaction_summary.saved_my_money_count = count
+
     return {
         "id": post.id,
         "author_id": post.author_id,
@@ -192,6 +209,7 @@ async def get_post(
         "created_at": post.created_at,
         "score": score,
         "images": images,
+        "reaction_summary": reaction_summary,
     }
 
 
