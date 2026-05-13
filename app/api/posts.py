@@ -191,9 +191,9 @@ async def get_post(
     for reaction_type, count in reaction_counts:
         if reaction_type == ReactionType.HELPFUL:
             reaction_summary.helpful_count = count
-        elif reaction_summary == ReactionType.SAME_HERE:
+        elif reaction_type == ReactionType.SAME_HERE:
             reaction_summary.same_here_count = count
-        elif reaction_summary == ReactionType.SAVED_MY_MONEY:
+        elif reaction_type == ReactionType.SAVED_MY_MONEY:
             reaction_summary.saved_my_money_count = count
 
     return {
