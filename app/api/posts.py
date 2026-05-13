@@ -658,3 +658,13 @@ async def post_reaction(
             "post_id": post_id,
             "reaction_type": reaction_type,
         }
+
+    if existing_reaction.reaction_type == reaction_type:
+        await db.delete(existing_reaction)
+        await db.commit()
+
+        return {
+            "status": "deleted",
+            "post_id": post_id,
+            "reaction_type": None,
+        }
