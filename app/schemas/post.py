@@ -58,6 +58,9 @@ class PostResponse(BaseModel):
 
     score: ProductFailScoreResponse | None = None
 
+
+class PostDetailResponse(PostResponse):
+    confidence_score: float
     images: list[PostImageResponse] = []
 
     reaction_summary: ReactionSummaryResponse | None = None

@@ -11,6 +11,7 @@ from app.database import get_db_session
 from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.models.reaction import PostReaction, ReactionType
 from app.schemas.reaction import ReactionToggleResponse, ReactionSummaryResponse
+from app.services.confidence_score_service import calculate_confidence_score
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -25,6 +26,7 @@ from app.schemas.post import (
     PostImageResponse,
     PostListResponse,
     PostResponse,
+    PostDetailResponse,
     PostUpdateRequest,
 )
 
@@ -155,7 +157,7 @@ async def get_posts(
     )
 
 
-@router.get("/{post_id}", response_model=PostResponse)
+@router.get("/{post_id}", response_model=PostDetailResponse)
 async def get_post(
     post_id: int,
     db=Depends(get_db_session),
@@ -196,6 +198,18 @@ async def get_post(
         elif reaction_type == ReactionType.SAVED_MY_MONEY:
             reaction_summary.saved_my_money_count = count
 
+    comment_count_result = await db.execute(
+        select(func.count(Comment.id)).where(Comment.post_id == post_id)
+    )
+    comment_count = comment_count_result.scalar_one()
+
+    confidence_score = calculate_confidence_score(
+        helpful_count=reaction_summary.helpful_count,
+        same_here_count=reaction_summary.same_here_count,
+        comment_count=comment_count,
+        image_count=len(images),
+    )
+
     my_reaction = None
     if current_user is not None:
         my_reaction_result = await db.execute(
@@ -222,6 +236,7 @@ async def get_post(
         "score": score,
         "images": images,
         "reaction_summary": reaction_summary,
+        "confidence_score": confidence_score,
         "my_reaction": my_reaction,
     }
 
