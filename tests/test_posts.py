@@ -252,7 +252,7 @@ def test_delete_image_by_non_author_returns_403():
 # Reaction Test ----------------------------------------------------------------
 
 
-# # Helper def when user request to react to a post
+# Helper for sending a reaction request as a logged-in user.
 def react_to_post(client: TestClient, post_id: int, headers: dict, reaction_type: str):
     return client.post(
         f"/posts/{post_id}/reactions/{reaction_type}",
@@ -411,3 +411,30 @@ def test_post_detail_includes_my_reaction_for_logged_in_user():
 
         assert response_data["my_reaction"] == "SAME_HERE"
         assert reaction_summary["same_here_count"] == 1
+
+
+# Confidence Score Test ----------------------------------------------
+def test_post_detail_includes_confidence_score():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        reactor_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+
+        post_id = create_test_post(client, author_headers)
+
+        react_response = react_to_post(
+            client,
+            post_id,
+            reactor_headers,
+            "HELPFUL",
+        )
+
+        assert react_response.status_code == 200
+
+        response = client.get(f"/posts/{post_id}")
+
+        assert response.status_code == 200
+        assert response.json()["confidence_score"] == 6.1
