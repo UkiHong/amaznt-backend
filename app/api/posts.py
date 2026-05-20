@@ -12,6 +12,7 @@ from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.models.reaction import PostReaction, ReactionType
 from app.schemas.reaction import ReactionToggleResponse, ReactionSummaryResponse
 from app.services.confidence_score_service import calculate_confidence_score
+from app.services.money_saved_service import calculate_estimated_money_saved
 from app.services.product_fail_score_service import (
     CALCULATION_VERSION,
     calculate_final_score,
@@ -210,6 +211,11 @@ async def get_post(
         image_count=len(images),
     )
 
+    estimated_money_saved = calculate_estimated_money_saved(
+        saved_my_money_count=reaction_summary.saved_my_money_count,
+        price_paid=post.price_paid,
+    )
+
     my_reaction = None
     if current_user is not None:
         my_reaction_result = await db.execute(
@@ -237,6 +243,7 @@ async def get_post(
         "images": images,
         "reaction_summary": reaction_summary,
         "confidence_score": confidence_score,
+        "estimated_money_saved": estimated_money_saved,
         "my_reaction": my_reaction,
     }
 

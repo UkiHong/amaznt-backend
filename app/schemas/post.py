@@ -61,6 +61,7 @@ class PostResponse(BaseModel):
 
 class PostDetailResponse(PostResponse):
     confidence_score: float
+    estimated_money_saved: Decimal
     images: list[PostImageResponse] = []
 
     reaction_summary: ReactionSummaryResponse | None = None
