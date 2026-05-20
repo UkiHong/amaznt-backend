@@ -24,7 +24,7 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Version | Goal | Scope | Outcome |
 |---|---|---|---|
 | MVP v1 | Build the foundation | FastAPI setup, PostgreSQL, SQLAlchemy, Alembic, User model, registration, login, `/auth/me`, Product Fail Post CRUD, Buyer Regret Score v1, local run, smoke tests | A working backend with authentication, post CRUD, and regret score calculation |
-| MVP v2 | Expand community behavior | Comments, reactions, Buyer Regret Score v2, ranking, reports, moderation, image upload, stronger tests | A more interactive community backend with richer user behavior |
+| MVP v2 | Expand community behavior | Comments, local image upload, reaction policy, reaction summary, Confidence Score v1, Estimated Money Saved, rankings, reports, moderation, stronger tests | A more interactive community backend with richer user behavior |
 | MVP v3 | Production readiness | Redis cache, rate limiting, GitHub Actions, deployment, performance tuning, documentation polish | A backend that is easier to run, test, deploy, and explain in a portfolio review |
 
 ## Tech Stack
@@ -65,7 +65,11 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Image retrieval | Done | Post detail responses include images, and images can be listed separately |
 | Static media serving | Done | Uploaded files are served through `/media/...` using FastAPI `StaticFiles` |
 | Image deletion | Done | Post authors can delete image metadata and local image files |
-| Core post/comment/image tests | In progress | Main success and authorization cases are covered; edge cases are still being expanded |
+| Reaction system | Done | Users can toggle `HELPFUL`, `SAME_HERE`, and `SAVED_MY_MONEY` reactions |
+| Reaction summary | Done | Post detail includes aggregate reaction counts and `my_reaction` |
+| Confidence Score v1 | Done | Post detail includes a trust score based on reactions, comments, and images |
+| Estimated Money Saved | Done | Post detail estimates saved money from `SAVED_MY_MONEY` count and `price_paid` |
+| Core post/comment/image/reaction tests | In progress | Main success and authorization cases are covered; edge cases are still being expanded |
 | Docker local environment | Done | FastAPI app and PostgreSQL run together with Docker Compose |
 | Docker migration workflow | Done | Alembic can run inside the app container against Docker PostgreSQL |
 
@@ -74,7 +78,6 @@ I wanted to build a backend project that also covers the parts that matter in pr
 
 | Feature | Status | Notes |
 |---|---|---|
-| Reaction system | Planned | Community feedback for v2 score calculation |
 | Ranking / popular posts | Planned | Community engagement layer |
 | Admin / moderation features | Planned | Reporting and control |
 | Redis caching and rate limiting | Planned | Performance and abuse control |
@@ -259,6 +262,53 @@ Grades:
 
 The calculated score is stored in `product_fail_scores` with a grade and `calculation_version`, so future score formulas can be introduced without losing track of how older scores were calculated.
 
+## Confidence Score
+
+Confidence Score is a derived post-detail metric. It is calculated from community trust signals:
+
+- `same_here_count`
+- `helpful_count`
+- `comment_count`
+- `image_count`
+
+It is returned only from:
+
+```text
+GET /posts/{post_id}
+```
+
+Response field:
+
+```text
+confidence_score
+```
+
+The score is calculated at read time and is not stored in the database.
+
+## Estimated Money Saved
+
+Estimated Money Saved is a derived post-detail metric, not a normalized score.
+
+```text
+estimated_money_saved = saved_my_money_count * price_paid
+```
+
+It uses the `SAVED_MY_MONEY` reaction count to estimate how much money a post may have helped other users avoid spending.
+
+It is returned only from:
+
+```text
+GET /posts/{post_id}
+```
+
+Response field:
+
+```text
+estimated_money_saved
+```
+
+This value is calculated at read time and is not stored in the database.
+
 ## API Summary
 
 ### System
@@ -282,9 +332,15 @@ The calculated score is stored in `product_fail_scores` with a grade and `calcul
 |---|---|---|
 | `POST` | `/posts` | Create a failed purchase post and calculate Buyer Regret Score |
 | `GET` | `/posts` | List posts with pagination |
-| `GET` | `/posts/{post_id}` | Get one post with score and uploaded images |
+| `GET` | `/posts/{post_id}` | Get one post with score, images, reaction summary, `confidence_score`, `my_reaction`, and `estimated_money_saved` |
 | `PATCH` | `/posts/{post_id}` | Update a post and optionally recalculate score |
 | `DELETE` | `/posts/{post_id}` | Delete a post owned by the current user |
+
+### Reactions
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/posts/{post_id}/reactions/{reaction_type}` | Toggle a reaction for a post. Supports `HELPFUL`, `SAME_HERE`, and `SAVED_MY_MONEY` |
 
 ### Comments
 
@@ -341,11 +397,25 @@ Current test coverage includes:
 - image upload helper flow
 - image deletion by owner and non-author
 - post detail response including uploaded images
+- reaction toggle create/delete/update behavior
+- author self-reaction restriction
+- anonymous post detail reaction summary
+- logged-in `my_reaction` state
+- Confidence Score service and post detail response
+- Estimated Money Saved service and post detail response
 
 Run tests with:
 
+If the virtual environment is active:
+
 ```bash
 pytest
+```
+
+Or use the explicit project interpreter:
+
+```bash
+.venv/bin/python -m pytest
 ```
 
 ## Troubleshooting Notes

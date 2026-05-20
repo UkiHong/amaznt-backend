@@ -34,7 +34,7 @@ class ReactionType(str, Enum):
     # ex) "I bought this too, and the same thing happened to me."
     SAME_HERE = "SAME_HERE"
 
-    # The review helped avoid buying the product. Used for Impact Score v1.
+    # The review helped avoid buying the product. Used for Estimated Money Saved.
     # ex) "This review helped me avoid buying this product."
     SAVED_MY_MONEY = "SAVED_MY_MONEY"
 
