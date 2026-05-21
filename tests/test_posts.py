@@ -51,7 +51,7 @@ def test_create_post_without_token_returns_401():
                 "price_paid": 19.99,
                 "fail_reason": "It broke after one use",
                 "platform": "Amazon",
-                "category": "Electronics",
+                "category": "electronics",
                 "value_regret_score": 4,
                 "description_mismatch_score": 3,
                 "quality_disappointment_score": 2,
@@ -73,7 +73,7 @@ def create_test_post(client: TestClient, headers: dict) -> int:
             "price_paid": 19.99,
             "fail_reason": "It broke after one use",
             "platform": "Amazon",
-            "category": "Electronics",
+            "category": "electronics",
             "value_regret_score": 4,
             "description_mismatch_score": 3,
             "quality_disappointment_score": 2,
@@ -142,8 +142,25 @@ def test_post_create_request_rejects_scores_outside_1_to_5():
             price_paid=19.99,
             fail_reason="It broke after one use",
             platform="Amazon",
-            category="Electronics",
+            category="electronics",
             value_regret_score=0,  # Invalid score
+            description_mismatch_score=3,
+            quality_disappointment_score=4,
+            funniness_score=5,
+            anger_score=2,
+        )
+
+
+def test_post_create_request_rejects_unknown_category():
+    with pytest.raises(ValidationError):
+        PostCreateRequest(
+            title="Test Post",
+            product_name="Test Product",
+            price_paid=19.99,
+            fail_reason="It broke after one use",
+            platform="Amazon",
+            category="random nonsense",
+            value_regret_score=4,
             description_mismatch_score=3,
             quality_disappointment_score=4,
             funniness_score=5,

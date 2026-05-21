@@ -66,7 +66,7 @@ async def create_post(
         fail_reason=request.fail_reason,
         platform=request.platform,
         product_url=request.product_url,
-        category=request.category,
+        category=request.category.value,
     )
     db.add(new_post)
 
@@ -311,6 +311,8 @@ async def update_post(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"{key} cannot be null",
                 )
+            if key == "category":
+                value = value.value
             setattr(post, key, value)
 
         elif key in score_fields:

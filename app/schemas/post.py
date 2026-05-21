@@ -1,11 +1,20 @@
 # Schemas for POST-related API requests and responses
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.reaction import ReactionType
 from app.schemas.reaction import ReactionSummaryResponse
+
+
+class PostCategory(StrEnum):
+    ELECTRONICS = "electronics"
+    BEAUTY = "beauty"
+    HOME = "home"
+    CLOTHING = "clothing"
+    OTHER = "other"
 
 
 class PostCreateRequest(BaseModel):
@@ -15,7 +24,7 @@ class PostCreateRequest(BaseModel):
     fail_reason: str
     platform: str
     product_url: str | None = None
-    category: str
+    category: PostCategory
     value_regret_score: int = Field(
         ge=1, le=5, description="Score for value regret, between 1 and 5"
     )
@@ -83,7 +92,7 @@ class PostUpdateRequest(BaseModel):
     fail_reason: str | None = None
     platform: str | None = None
     product_url: str | None = None
-    category: str | None = None
+    category: PostCategory | None = None
 
     value_regret_score: int | None = Field(
         default=None, ge=1, le=5, description="Score for value regret, between 1 and 5"
