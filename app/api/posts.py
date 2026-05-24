@@ -11,6 +11,7 @@ from app.database import get_db_session
 from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.models.reaction import PostReaction, ReactionType
 from app.schemas.reaction import ReactionToggleResponse, ReactionSummaryResponse
+from app.services.category_score_summary import get_category_score_summary
 from app.services.confidence_score_service import calculate_confidence_score
 from app.services.money_saved_service import calculate_estimated_money_saved
 from app.services.product_fail_score_service import (
@@ -177,6 +178,11 @@ async def get_post(
         select(ProductFailScore).where(ProductFailScore.post_id == post_id)
     )
     score = score_result.scalar_one_or_none()
+    if score is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post score not found",
+        )
 
     images_result = await db.execute(
         select(PostImage).where(PostImage.post_id == post_id)
@@ -228,6 +234,12 @@ async def get_post(
         if my_reaction_row is not None:
             my_reaction = my_reaction_row.reaction_type
 
+    category_summary = await get_category_score_summary(
+        db=db,
+        category=post.category,
+        current_score=score.final_score,
+    )
+
     return {
         "id": post.id,
         "author_id": post.author_id,
@@ -245,6 +257,9 @@ async def get_post(
         "confidence_score": confidence_score,
         "estimated_money_saved": estimated_money_saved,
         "my_reaction": my_reaction,
+        "category_average_score": category_summary["category_average_score"],
+        "score_delta": category_summary["score_delta"],
+        "category_post_count": category_summary["category_post_count"],
     }
 
 
