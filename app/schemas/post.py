@@ -76,6 +76,10 @@ class PostDetailResponse(PostResponse):
     reaction_summary: ReactionSummaryResponse | None = None
     my_reaction: ReactionType | None = None
 
+    category_average_score: Decimal | None = None
+    score_delta: Decimal | None = None
+    category_post_count: int
+
 
 # getting a list of posts with count
 class PostListResponse(BaseModel):
