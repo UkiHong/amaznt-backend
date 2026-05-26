@@ -10,7 +10,9 @@ from app.core.security import get_current_active_user, get_optional_current_user
 from app.database import get_db_session
 from app.models.post import Comment, Post, PostImage, ProductFailScore
 from app.models.reaction import PostReaction, ReactionType
+from app.models.verdict import PostVerdict, VerdictType
 from app.schemas.reaction import ReactionToggleResponse, ReactionSummaryResponse
+from app.schemas.verdict import VerdictToggleResponse, VerdictSummaryResponse
 from app.services.category_score_summary import get_category_score_summary
 from app.services.confidence_score_service import calculate_confidence_score
 from app.services.money_saved_service import calculate_estimated_money_saved
@@ -749,4 +751,71 @@ async def post_reaction(
         "status": "updated",
         "post_id": post_id,
         "reaction_type": reaction_type,
+    }
+
+
+# ------------------------VERDICT--------------------------------------
+@router.post(
+    "/{post_id}/verdicts/{verdict_type}",
+    response_model=VerdictToggleResponse,
+)
+async def post_verdict(
+    post_id: int,
+    verdict_type: VerdictType,
+    db=Depends(get_db_session),
+    current_user=Depends(get_current_active_user),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    if post.author_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to leave a verdict on your own post",
+        )
+
+    existing_verdict_result = await db.execute(
+        select(PostVerdict).where(
+            PostVerdict.post_id == post_id,
+            PostVerdict.user_id == current_user.id,
+        )
+    )
+    existing_verdict = existing_verdict_result.scalar_one_or_none()
+
+    if existing_verdict is None:
+        new_verdict = PostVerdict(
+            user_id=current_user.id, post_id=post_id, verdict_type=verdict_type
+        )
+
+        db.add(new_verdict)
+        await db.commit()
+
+        return {
+            "status": "created",
+            "post_id": post_id,
+            "verdict_type": verdict_type,
+        }
+
+    if existing_verdict.verdict_type == verdict_type:
+        await db.delete(existing_verdict)
+        await db.commit()
+
+        return {
+            "status": "deleted",
+            "post_id": post_id,
+            "verdict_type": None,
+        }
+
+    existing_verdict.verdict_type = verdict_type
+    await db.commit()
+    return {
+        "status": "updated",
+        "post_id": post_id,
+        "verdict_type": verdict_type,
     }

@@ -6,7 +6,9 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.reaction import ReactionType
+from app.models.verdict import VerdictType
 from app.schemas.reaction import ReactionSummaryResponse
+from app.schemas.verdict import VerdictSummaryResponse
 
 
 class PostCategory(StrEnum):
@@ -79,6 +81,9 @@ class PostDetailResponse(PostResponse):
     category_average_score: Decimal | None = None
     score_delta: Decimal | None = None
     category_post_count: int
+
+    verdict_summary: VerdictSummaryResponse | None = None
+    my_verdict: VerdictType | None = None
 
 
 # getting a list of posts with count
