@@ -2,3 +2,4 @@
 from app.models.user import User
 from app.models.post import Post, ProductFailScore, Comment, PostImage
 from app.models.reaction import PostReaction, ReactionType
+from app.models.verdict import PostVerdict, VerdictType
