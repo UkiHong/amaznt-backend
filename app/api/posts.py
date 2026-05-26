@@ -207,6 +207,20 @@ async def get_post(
         elif reaction_type == ReactionType.SAVED_MY_MONEY:
             reaction_summary.saved_my_money_count = count
 
+    verdict_count_result = await db.execute(
+        select(PostVerdict.verdict_type, func.count(PostVerdict.id))
+        .where(PostVerdict.post_id == post.id)
+        .group_by(PostVerdict.verdict_type)
+    )
+    verdict_counts = verdict_count_result.all()
+
+    verdict_summary = VerdictSummaryResponse()
+    for verdict_type, count in verdict_counts:
+        if verdict_type == VerdictType.AGREE:
+            verdict_summary.agree_count = count
+        elif verdict_type == VerdictType.DISAGREE:
+            verdict_summary.disagree_count = count
+
     comment_count_result = await db.execute(
         select(func.count(Comment.id)).where(Comment.post_id == post_id)
     )
@@ -236,6 +250,18 @@ async def get_post(
         if my_reaction_row is not None:
             my_reaction = my_reaction_row.reaction_type
 
+    my_verdict = None
+    if current_user is not None:
+        my_verdict_result = await db.execute(
+            select(PostVerdict).where(
+                PostVerdict.post_id == post_id,
+                PostVerdict.user_id == current_user.id,
+            )
+        )
+        my_verdict_row = my_verdict_result.scalar_one_or_none()
+        if my_verdict_row is not None:
+            my_verdict = my_verdict_row.verdict_type
+
     category_summary = await get_category_score_summary(
         db=db,
         category=post.category,
@@ -262,6 +288,8 @@ async def get_post(
         "category_average_score": category_summary["category_average_score"],
         "score_delta": category_summary["score_delta"],
         "category_post_count": category_summary["category_post_count"],
+        "verdict_summary": verdict_summary,
+        "my_verdict": my_verdict,
     }
 
 
