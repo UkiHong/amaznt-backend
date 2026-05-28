@@ -267,8 +267,6 @@ def test_delete_image_by_non_author_returns_403():
 
 
 # Reaction Test ----------------------------------------------------------------
-
-
 # Helper for sending a reaction request as a logged-in user.
 def react_to_post(client: TestClient, post_id: int, headers: dict, reaction_type: str):
     return client.post(
@@ -480,3 +478,164 @@ def test_post_detail_includes_estimated_money_saved():
 
         assert response.status_code == 200
         assert response.json()["estimated_money_saved"] == "19.99"
+
+
+# Verdict Test ----------------------------------------------------
+# Helper for sending a verdict request as a logged-in user.
+def verdict_to_post(client: TestClient, post_id: int, headers: dict, verdict_type: str):
+    return client.post(
+        f"/posts/{post_id}/verdicts/{verdict_type}",
+        headers=headers,
+    )
+
+
+def test_same_verdict_toggles_off():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        verdict_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+        post_id = create_test_post(client, author_headers)
+
+        first_response = verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            "AGREE",
+        )
+
+        second_response = verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            "AGREE",
+        )
+
+        assert first_response.status_code == 200
+        assert first_response.json()["status"] == "created"
+        assert first_response.json()["verdict_type"] == "AGREE"
+
+        assert second_response.status_code == 200
+        assert second_response.json()["status"] == "deleted"
+        assert second_response.json()["verdict_type"] is None
+
+
+def test_different_verdict_updates_existing_verdict():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        verdict_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+        post_id = create_test_post(client, author_headers)
+
+        first_response = verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            "AGREE",
+        )
+
+        second_response = verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            "DISAGREE",
+        )
+
+        assert first_response.status_code == 200
+        assert first_response.json()["status"] == "created"
+        assert first_response.json()["verdict_type"] == "AGREE"
+
+        assert second_response.status_code == 200
+        assert second_response.json()["status"] == "updated"
+        assert second_response.json()["verdict_type"] == "DISAGREE"
+
+
+def test_author_cannot_verdict_to_own_post():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+
+        post_id = create_test_post(client, author_headers)
+
+        my_verdict = verdict_to_post(
+            client,
+            post_id,
+            author_headers,
+            "AGREE",
+        )
+
+        assert my_verdict.status_code == 403
+
+
+def test_post_detail_includes_verdict_summary_for_anonymous_user():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+
+        post_id = create_test_post(client, author_headers)
+
+        # A different user leaves a verdict on the post.
+        verdict_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+
+        # Anonymous users can still read post detail.
+        # No Authorization header is sent here.
+        verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            verdict_type="AGREE",
+        )
+
+        response = client.get(f"/posts/{post_id}")
+
+        assert response.status_code == 200
+
+        response_data = response.json()
+        verdict_summary = response_data["verdict_summary"]
+
+        # Verdict summary is public aggregate data.
+        assert verdict_summary["agree_count"] == 1
+        assert verdict_summary["disagree_count"] == 0
+
+        # Anonymous users do not have a personal verdict state.
+        assert response_data["my_verdict"] is None
+
+
+def test_post_detail_includes_my_verdict_for_logged_in_user():
+    with TestClient(app) as client:
+        author_headers = make_auth_headers(client)
+        post_id = create_test_post(client, author_headers)
+
+        # This user will check if my_verdict shows when getting the post
+        verdict_headers = make_auth_headers(
+            client,
+            TEST_DUMMY_EMAIL,
+            TEST_DUMMY_PASSWORD,
+        )
+
+        verdict_response = verdict_to_post(
+            client,
+            post_id,
+            verdict_headers,
+            "AGREE",
+        )
+        assert verdict_response.status_code == 200
+
+        response = client.get(
+            f"/posts/{post_id}",
+            headers=verdict_headers,
+        )
+        assert response.status_code == 200
+
+        response_data = response.json()
+        verdict_summary = response_data["verdict_summary"]
+
+        assert response_data["my_verdict"] == "AGREE"
+        assert verdict_summary["agree_count"] == 1
