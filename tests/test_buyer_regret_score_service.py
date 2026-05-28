@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from app.services.product_fail_score_service import (
-    CALCULATION_VERSION,
+from app.services.buyer_regret_score_service import (
+    CALCULATION_VERSION_V1,
     calculate_final_score,
     get_grade,
     normalize_score,
@@ -10,7 +10,7 @@ import pytest
 
 
 def test_calculation_version_is_fail_score_v1():
-    assert CALCULATION_VERSION == "fail_score_v1"
+    assert CALCULATION_VERSION_V1 == "fail_score_v1"
 
 
 def test_normalize_score_returns_20_for_1():

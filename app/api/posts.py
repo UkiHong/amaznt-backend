@@ -16,8 +16,8 @@ from app.schemas.verdict import VerdictToggleResponse, VerdictSummaryResponse
 from app.services.category_score_summary import get_category_score_summary
 from app.services.confidence_score_service import calculate_confidence_score
 from app.services.money_saved_service import calculate_estimated_money_saved
-from app.services.product_fail_score_service import (
-    CALCULATION_VERSION,
+from app.services.buyer_regret_score_service import (
+    CALCULATION_VERSION_V1,
     calculate_final_score,
     get_grade,
     normalize_score,
@@ -94,7 +94,7 @@ async def create_post(
         anger_score=normalize_score(request.anger_score),
         final_score=final_score,
         grade=get_grade(final_score),
-        calculation_version=CALCULATION_VERSION,
+        calculation_version=CALCULATION_VERSION_V1,
     )
     db.add(new_score)
 
