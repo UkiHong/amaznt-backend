@@ -2,7 +2,7 @@
 
 Status: Design Draft
 
-This document describes the planned Buyer Regret Score v2 design for Amazn't. It is not implemented yet. The current implemented score is still Buyer Regret Score v1 in `app/services/product_fail_score_service.py`.
+This document describes the Buyer Regret Score v2 design for Amazn't. The v2 calculation service is implemented in `app/services/buyer_regret_score_service.py`.
 
 ## Goal
 
