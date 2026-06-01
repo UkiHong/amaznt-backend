@@ -11,8 +11,8 @@ from fastapi import FastAPI
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.posts import router as posts_router
+from app.api.rankings import router as rankings_router
 from fastapi.staticfiles import StaticFiles
-
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -35,6 +35,6 @@ def read_root():
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(posts_router)
-
+app.include_router(rankings_router)
 # This is to open uploaded images on HTTP URL.
 app.mount("/media", StaticFiles(directory="media"), name="media")
