@@ -39,3 +39,21 @@ class BuyerRegretRankingResponse(BaseModel):
     period: RankingPeriod
     rankings: list[BuyerRegretRankingItem]
     count: int
+
+
+# Wallet Saved Ranking Schemas --------------------------------------------------------
+class WalletSavedRankingItem(BaseModel):
+    post_id: int
+    title: str
+    product_name: str
+    category: str
+    price_paid: Decimal
+    currency: str
+    created_at: datetime
+    estimated_money_saved: Decimal
+    saved_my_money_count: int
+
+
+class WalletSavedRankingResponse(BaseModel):
+    rankings: list[WalletSavedRankingItem]
+    count: int

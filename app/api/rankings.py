@@ -11,6 +11,8 @@ from app.schemas.ranking import (
     RankingPeriod,
     BuyerRegretRankingItem,
     BuyerRegretRankingResponse,
+    WalletSavedRankingItem,
+    WalletSavedRankingResponse,
 )
 
 from app.services.buyer_regret_score_service import (
@@ -137,6 +139,58 @@ async def get_buyer_regret_ranking(
 
     return BuyerRegretRankingResponse(
         period=period,
+        rankings=limited_items,
+        count=len(limited_items),
+    )
+
+
+# Wallet Saved Ranking -----------------------------------------------------------
+@router.get("/wallet-saved", response_model=WalletSavedRankingResponse)
+async def get_wallet_saved_ranking(
+    limit: int = Query(10, ge=1, le=100),
+    db=Depends(get_db_session),
+):
+    query = (
+        select(Post, func.count(PostReaction.id).label("saved_my_money_count"))
+        .select_from(Post)
+        .join(PostReaction, PostReaction.post_id == Post.id)
+        .where(PostReaction.reaction_type == ReactionType.SAVED_MY_MONEY)
+        .group_by(Post.id)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    ranking_items = []
+
+    for post, saved_my_money_count in rows:
+        estimated_money_saved = post.price_paid * saved_my_money_count
+
+        ranking_items.append(
+            WalletSavedRankingItem(
+                post_id=post.id,
+                title=post.title,
+                product_name=post.product_name,
+                category=post.category,
+                price_paid=post.price_paid,
+                currency=post.currency,
+                created_at=post.created_at,
+                estimated_money_saved=estimated_money_saved,
+                saved_my_money_count=saved_my_money_count,
+            )
+        )
+
+    ranking_items.sort(
+        key=lambda item: (
+            item.estimated_money_saved,
+            item.saved_my_money_count,
+            item.created_at,
+        ),
+        reverse=True,
+    )
+    limited_items = ranking_items[:limit]
+
+    return WalletSavedRankingResponse(
         rankings=limited_items,
         count=len(limited_items),
     )
