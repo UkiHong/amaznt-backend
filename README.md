@@ -69,7 +69,12 @@ I wanted to build a backend project that also covers the parts that matter in pr
 | Reaction summary | Done | Post detail includes aggregate reaction counts and `my_reaction` |
 | Confidence Score v1 | Done | Post detail includes a trust score based on reactions, comments, and images |
 | Estimated Money Saved | Done | Post detail estimates saved money from `SAVED_MY_MONEY` count and `price_paid` |
-| Core post/comment/image/reaction tests | In progress | Main success and authorization cases are covered; edge cases are still being expanded |
+| Category comparison | Done | Post detail includes category average score, score delta, and category post count |
+| Community Verdict API | Done | Users can toggle `AGREE` and `DISAGREE` verdicts; post detail includes summary and `my_verdict` |
+| Buyer Regret Score v2 | Done | Combines author score with capped community validation from `SAME_HERE`, `AGREE`, and `DISAGREE` |
+| Buyer Regret ranking | Done | `GET /rankings/buyer-regret` ranks posts by Buyer Regret Score v2 |
+| Wallet Saved ranking | Done | `GET /rankings/wallet-saved` ranks posts by `estimated_money_saved` |
+| Core API and service tests | In progress | Main success, authorization, scoring, verdict, and ranking cases are covered; edge cases are still being expanded |
 | Docker local environment | Done | FastAPI app and PostgreSQL run together with Docker Compose |
 | Docker migration workflow | Done | Alembic can run inside the app container against Docker PostgreSQL |
 
@@ -78,7 +83,7 @@ I wanted to build a backend project that also covers the parts that matter in pr
 
 | Feature | Status | Notes |
 |---|---|---|
-| Ranking / popular posts | Planned | Community engagement layer |
+| Trending ranking | Planned | Separate engagement-based ranking using reactions, verdicts, and comments |
 | Admin / moderation features | Planned | Reporting and control |
 | Redis caching and rate limiting | Planned | Performance and abuse control |
 | GitHub Actions CI | Planned | Automated checks |
@@ -214,7 +219,11 @@ environment:
 
 ## Buyer Regret Score
 
-Buyer Regret Score is the main feature of this project. In MVP v1, the score is calculated from user-entered regret inputs:
+Buyer Regret Score is the main feature of this project.
+
+### Buyer Regret Score v1
+
+In MVP v1, the score is calculated from user-entered regret inputs:
 
 - `value_regret_score`
 - `description_mismatch_score`
@@ -262,6 +271,45 @@ Grades:
 
 The calculated score is stored in `product_fail_scores` with a grade and `calculation_version`, so future score formulas can be introduced without losing track of how older scores were calculated.
 
+### Buyer Regret Score v2
+
+Buyer Regret Score v2 keeps the stored v1 score as the author score, then applies a capped community validation signal.
+
+It uses:
+
+- `author_score`
+- `SAME_HERE`
+- `AGREE`
+- `DISAGREE`
+
+It does not use:
+
+- `SAVED_MY_MONEY`
+
+`SAVED_MY_MONEY` is excluded because it measures post impact, not product failure severity.
+
+Current calculation version:
+
+```text
+fail_score_v2
+```
+
+The v2 score is currently calculated at read time for:
+
+```text
+GET /rankings/buyer-regret
+```
+
+Ranking order:
+
+```text
+buyer_regret_score DESC
+community_validation_count DESC
+created_at DESC
+```
+
+More detail is documented in `docs/buyer_regret_score_v2.md`.
+
 ## Confidence Score
 
 Confidence Score is a derived post-detail metric. It is calculated from community trust signals:
@@ -295,10 +343,11 @@ estimated_money_saved = saved_my_money_count * price_paid
 
 It uses the `SAVED_MY_MONEY` reaction count to estimate how much money a post may have helped other users avoid spending.
 
-It is returned only from:
+It is returned from post detail and wallet-saved ranking responses:
 
 ```text
 GET /posts/{post_id}
+GET /rankings/wallet-saved
 ```
 
 Response field:
@@ -308,6 +357,52 @@ estimated_money_saved
 ```
 
 This value is calculated at read time and is not stored in the database.
+
+Wallet Saved ranking uses the same formula and sorts by:
+
+```text
+estimated_money_saved DESC
+saved_my_money_count DESC
+created_at DESC
+```
+
+## Category Comparison
+
+Post detail includes category-level comparison fields:
+
+```text
+category_average_score
+score_delta
+category_post_count
+```
+
+The category average is based on posts in the same `PostCategory`. The current MVP keeps categories as an enum instead of a separate `categories` table.
+
+## Community Verdict
+
+Community Verdict is separate from reactions. Verdicts are used as product failure validation signals for Buyer Regret Score v2.
+
+Supported verdict types:
+
+```text
+AGREE
+DISAGREE
+```
+
+Policy:
+
+- One user can leave one verdict per post.
+- Tapping the same verdict again toggles it off.
+- Tapping a different verdict replaces the previous verdict.
+- Post authors cannot leave verdicts on their own posts.
+- Database constraint: `UNIQUE(user_id, post_id)`.
+
+Post detail includes:
+
+```text
+verdict_summary
+my_verdict
+```
 
 ## API Summary
 
@@ -332,7 +427,7 @@ This value is calculated at read time and is not stored in the database.
 |---|---|---|
 | `POST` | `/posts` | Create a failed purchase post and calculate Buyer Regret Score |
 | `GET` | `/posts` | List posts with pagination |
-| `GET` | `/posts/{post_id}` | Get one post with score, images, reaction summary, `confidence_score`, `my_reaction`, and `estimated_money_saved` |
+| `GET` | `/posts/{post_id}` | Get one post with score, images, reaction summary, verdict summary, category comparison, `confidence_score`, `my_reaction`, `my_verdict`, and `estimated_money_saved` |
 | `PATCH` | `/posts/{post_id}` | Update a post and optionally recalculate score |
 | `DELETE` | `/posts/{post_id}` | Delete a post owned by the current user |
 
@@ -341,6 +436,19 @@ This value is calculated at read time and is not stored in the database.
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/posts/{post_id}/reactions/{reaction_type}` | Toggle a reaction for a post. Supports `HELPFUL`, `SAME_HERE`, and `SAVED_MY_MONEY` |
+
+### Verdicts
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/posts/{post_id}/verdicts/{verdict_type}` | Toggle a verdict for a post. Supports `AGREE` and `DISAGREE` |
+
+### Rankings
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/rankings/buyer-regret` | Rank posts by Buyer Regret Score v2. Supports `period=week`, `period=month`, and `period=all_time` |
+| `GET` | `/rankings/wallet-saved` | Rank posts by `estimated_money_saved`, calculated from `SAVED_MY_MONEY` count and `price_paid` |
 
 ### Comments
 
@@ -403,6 +511,11 @@ Current test coverage includes:
 - logged-in `my_reaction` state
 - Confidence Score service and post detail response
 - Estimated Money Saved service and post detail response
+- category score summary service and post detail response
+- Community Verdict toggle and post detail response
+- Buyer Regret Score v2 service
+- Buyer Regret ranking response and ordering
+- Wallet Saved ranking response and ordering
 
 Run tests with:
 

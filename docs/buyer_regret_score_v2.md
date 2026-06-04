@@ -1,6 +1,6 @@
 # Buyer Regret Score v2 Design
 
-Status: Design Draft
+Status: Implemented through Week 8 Day 7
 
 This document describes the Buyer Regret Score v2 design for Amazn't. The v2 calculation service is implemented in `app/services/buyer_regret_score_service.py`.
 
@@ -79,12 +79,12 @@ That is post impact, not product failure severity.
 
 ```text
 estimated_money_saved = saved_my_money_count * price_paid
-Wallet Saved Hall of Fame ranking
+Wallet Saved ranking
 ```
 
 ## Community Verdict Policy
 
-Planned verdict types:
+Implemented verdict types:
 
 ```text
 AGREE
@@ -101,18 +101,25 @@ Post authors cannot leave verdicts on their own posts.
 Database constraint: UNIQUE(user_id, post_id).
 ```
 
-Planned endpoint:
+Implemented endpoint:
 
 ```text
 POST /posts/{post_id}/verdicts/{verdict_type}
 ```
 
-Planned response shape:
+Response shape:
 
 ```text
 status: created | updated | deleted
 post_id
 verdict_type
+```
+
+Post detail also returns:
+
+```text
+verdict_summary
+my_verdict
 ```
 
 ## Formula Direction
@@ -230,6 +237,13 @@ estimated_money_saved =
   saved_my_money_count * price_paid
 ```
 
+This value is used by:
+
+```text
+GET /posts/{post_id}
+GET /rankings/wallet-saved
+```
+
 ### Buyer Regret Score v2
 
 Buyer Regret Score v2 answers:
@@ -253,18 +267,86 @@ It does not use:
 SAVED_MY_MONEY
 ```
 
-## Planned Implementation Steps
+## Ranking Usage
 
-1. Add `VerdictType` enum with `AGREE` and `DISAGREE`.
-2. Add `PostVerdict` model.
-3. Add Alembic migration for `post_verdicts`.
-4. Add verdict request/response schemas.
-5. Implement `POST /posts/{post_id}/verdicts/{verdict_type}`.
-6. Add verdict summary and `my_verdict` to post detail.
-7. Add Buyer Regret Score v2 service functions.
-8. Add focused service tests for smoothing, dynamic weight, and final score calculation.
+### Buyer Regret Ranking
 
-## Planned Calculation Version
+Buyer Regret ranking uses Buyer Regret Score v2 at read time.
+
+Endpoint:
+
+```text
+GET /rankings/buyer-regret
+```
+
+Supported periods:
+
+```text
+week
+month
+all_time
+```
+
+Sorting:
+
+```text
+buyer_regret_score DESC
+community_validation_count DESC
+created_at DESC
+```
+
+The ranking response includes both the stored author score and the calculated v2 score:
+
+```text
+author_score
+buyer_regret_score
+calculation_version
+same_here_count
+agree_count
+disagree_count
+community_validation_count
+```
+
+### Wallet Saved Ranking
+
+Wallet Saved ranking is separate from Buyer Regret ranking.
+
+Endpoint:
+
+```text
+GET /rankings/wallet-saved
+```
+
+Formula:
+
+```text
+estimated_money_saved = saved_my_money_count * price_paid
+```
+
+Sorting:
+
+```text
+estimated_money_saved DESC
+saved_my_money_count DESC
+created_at DESC
+```
+
+`HELPFUL`, `SAME_HERE`, `AGREE`, and `DISAGREE` are not used by Wallet Saved ranking.
+
+## Implemented Steps
+
+1. Added `VerdictType` enum with `AGREE` and `DISAGREE`.
+2. Added `PostVerdict` model.
+3. Added Alembic migration for `post_verdicts`.
+4. Added verdict request/response schemas.
+5. Implemented `POST /posts/{post_id}/verdicts/{verdict_type}`.
+6. Added verdict summary and `my_verdict` to post detail.
+7. Added Buyer Regret Score v2 service functions.
+8. Added focused service tests for smoothing, dynamic weight, and final score calculation.
+9. Added `GET /rankings/buyer-regret`.
+10. Added `GET /rankings/wallet-saved`.
+
+## Calculation Version
 
 ```text
 fail_score_v2
@@ -276,9 +358,10 @@ The existing v1 calculation version remains:
 fail_score_v1
 ```
 
-## Open Implementation Questions
+## Resolved Implementation Decisions
 
-- Should Buyer Regret Score v2 be stored in the database or calculated at read time?
-- Should v1 and v2 both be returned in post detail during the transition period?
-- Should rankings use v2 immediately after implementation or after enough community data exists?
-- Should `AGREE` / `DISAGREE` be shown in post detail before v2 ranking is enabled?
+- Buyer Regret Score v2 is calculated at read time for rankings instead of being stored in the database.
+- The stored `ProductFailScore.final_score` remains the author score.
+- `GET /rankings/buyer-regret` uses v2 immediately and explains the community validation counts in the response.
+- `AGREE` and `DISAGREE` are shown in post detail through `verdict_summary` and `my_verdict`.
+- `SAVED_MY_MONEY` is reserved for `estimated_money_saved` and Wallet Saved ranking.
