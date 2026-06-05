@@ -83,6 +83,7 @@ I wanted to build a backend project that also covers the parts that matter in pr
 
 | Feature | Status | Notes |
 |---|---|---|
+| Risky Category ranking | Planned | Category risk ranking using read-time Buyer Regret Score v2 aggregation and minimum post count |
 | Trending ranking | Planned | Separate engagement-based ranking using reactions, verdicts, and comments |
 | Admin / moderation features | Planned | Reporting and control |
 | Redis caching and rate limiting | Planned | Performance and abuse control |
@@ -532,6 +533,8 @@ Or use the explicit project interpreter:
 ```
 
 ## Troubleshooting Notes
+
+For structured engineering case studies, see `docs/troubleshooting.md`.
 
 ### 1. Alembic in Docker connected to the wrong database
 
