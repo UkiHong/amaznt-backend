@@ -57,3 +57,14 @@ class WalletSavedRankingItem(BaseModel):
 class WalletSavedRankingResponse(BaseModel):
     rankings: list[WalletSavedRankingItem]
     count: int
+
+
+class RiskyCategoryRankingItem(BaseModel):
+    category: str
+    average_buyer_regret_score: Decimal
+    post_count: int
+
+
+class RiskyCategoryRankingResponse(BaseModel):
+    rankings: list[RiskyCategoryRankingItem]
+    count: int

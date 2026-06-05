@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -13,12 +14,15 @@ from app.schemas.ranking import (
     BuyerRegretRankingResponse,
     WalletSavedRankingItem,
     WalletSavedRankingResponse,
+    RiskyCategoryRankingItem,
+    RiskyCategoryRankingResponse,
 )
 
 from app.services.buyer_regret_score_service import (
     CALCULATION_VERSION_V2,
     calculate_buyer_regret_score_v2,
 )
+from app.services.category_score_summary import MIN_CATEGORY_POST_COUNT
 
 router = APIRouter(
     prefix="/rankings",
@@ -193,4 +197,141 @@ async def get_wallet_saved_ranking(
     return WalletSavedRankingResponse(
         rankings=limited_items,
         count=len(limited_items),
+    )
+
+
+# Risky Category Ranking -----------------------------------------------------------
+@router.get("/categories/risky", response_model=RiskyCategoryRankingResponse)
+async def get_risky_category_ranking(
+    db=Depends(get_db_session),
+):
+    # Load the base ranking rows first.
+    # Post provides the category, and ProductFailScore provides the stored v1
+    # author score used as the base input for Buyer Regret Score v2.
+    query = (
+        select(Post, ProductFailScore)
+        .select_from(Post)
+        .join(ProductFailScore, ProductFailScore.post_id == Post.id)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Collect post IDs so reaction and verdict counts can be fetched in bulk.
+    # This avoids running one count query per post inside the loop below.
+    post_ids = [post.id for post, score in rows]
+
+    if not post_ids:
+        return RiskyCategoryRankingResponse(rankings=[], count=0)
+
+    # Count SAME_HERE reactions per post.
+    # SAME_HERE is part of the community validation input for v2.
+    same_here_count_results = await db.execute(
+        select(
+            PostReaction.post_id, func.count(PostReaction.id).label("same_here_count")
+        )
+        .select_from(PostReaction)
+        .where(
+            PostReaction.post_id.in_(post_ids),
+            PostReaction.reaction_type == ReactionType.SAME_HERE,
+        )
+        .group_by(PostReaction.post_id)
+    )
+
+    # Convert rows like [(post_id, count)] into a lookup table:
+    # {post_id: same_here_count}.
+    # Posts without SAME_HERE reactions will not appear here, so callers use
+    # .get(post.id, 0) later.
+    same_here_count_by_post_id = {
+        post_id: same_here_count
+        for post_id, same_here_count in same_here_count_results.all()
+    }
+
+    # Count AGREE and DISAGREE verdicts per post in one query.
+    # These two counts are the verdict inputs for Buyer Regret Score v2.
+    verdict_results = await db.execute(
+        select(
+            PostVerdict.post_id,
+            func.count()
+            .filter(PostVerdict.verdict_type == VerdictType.AGREE)
+            .label("agree_count"),
+            func.count()
+            .filter(PostVerdict.verdict_type == VerdictType.DISAGREE)
+            .label("disagree_count"),
+        )
+        .select_from(PostVerdict)
+        .where(PostVerdict.post_id.in_(post_ids))
+        .group_by(PostVerdict.post_id)
+    )
+
+    # Convert rows like [(post_id, agree_count, disagree_count)] into a lookup
+    # table so the v2 calculation can read both verdict counts by post ID.
+    verdict_counts_by_post_id = {
+        post_id: {
+            "agree_count": agree_count,
+            "disagree_count": disagree_count,
+        }
+        for post_id, agree_count, disagree_count in verdict_results.all()
+    }
+
+    # category_scores groups calculated v2 scores by category.
+    # Example: {"electronics": [Decimal("82.00"), Decimal("91.50")]}.
+    category_scores = {}
+
+    # Calculate each post's read-time v2 score, then add it to its category.
+    for post, score in rows:
+        same_here_count = same_here_count_by_post_id.get(post.id, 0)
+
+        verdict_counts = verdict_counts_by_post_id.get(
+            post.id, {"agree_count": 0, "disagree_count": 0}
+        )
+        agree_count = verdict_counts["agree_count"]
+        disagree_count = verdict_counts["disagree_count"]
+
+        buyer_regret_score = calculate_buyer_regret_score_v2(
+            author_score=score.final_score,
+            same_here_count=same_here_count,
+            agree_count=agree_count,
+            disagree_count=disagree_count,
+        )
+
+        if post.category not in category_scores:
+            category_scores[post.category] = []
+
+        category_scores[post.category].append(buyer_regret_score)
+
+    ranking_items = []
+    for category, scores in category_scores.items():
+        post_count = len(scores)
+
+        # Skip categories with too few posts to avoid small-sample bias.
+        if post_count < MIN_CATEGORY_POST_COUNT:
+            continue
+
+        # Average the already-calculated v2 scores for this category.
+        average_buyer_regret_score = (sum(scores) / post_count).quantize(
+            Decimal("0.01")
+        )
+
+        ranking_items.append(
+            RiskyCategoryRankingItem(
+                category=category,
+                average_buyer_regret_score=average_buyer_regret_score,
+                post_count=post_count,
+            )
+        )
+
+    # Rank riskier categories first. If two categories have the same average,
+    # prefer the one backed by more posts.
+    ranking_items.sort(
+        key=lambda item: (
+            item.average_buyer_regret_score,
+            item.post_count,
+        ),
+        reverse=True,
+    )
+
+    return RiskyCategoryRankingResponse(
+        rankings=ranking_items,
+        count=len(ranking_items),
     )
